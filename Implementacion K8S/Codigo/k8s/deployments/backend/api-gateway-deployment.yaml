@@ -12,6 +12,7 @@ spec:
     metadata:
       labels:
         app: pharmago-api-gateway
+        pharmago.io/tier: microservice
     spec:
       affinity:
         nodeAffinity:
@@ -21,6 +22,20 @@ spec:
               - key: node-type
                 operator: In
                 values: [backend, all]
+        # Regla de despliegue: dos microservicios distintos nunca comparten nodo físico.
+        # Se excluye la propia app para que el RollingUpdate pueda levantar el pod nuevo
+        # en el mismo nodo que el viejo sin quedar Pending.
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: pharmago.io/tier
+                operator: In
+                values: [microservice]
+              - key: app
+                operator: NotIn
+                values: [pharmago-api-gateway]
+            topologyKey: kubernetes.io/hostname
       containers:
       - name: pharmago-api-gateway
         image: pharmago-api-gateway:latest
