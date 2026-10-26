@@ -10,6 +10,7 @@ using Yarp.ReverseProxy.Transforms;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMemoryCache();
+builder.Services.AddHealthChecks();
 
 var rateLimitMode = builder.Configuration["RateLimiting:Mode"] ?? "IP";
 
@@ -91,10 +92,10 @@ else if (rateLimitMode.Equals("User", StringComparison.OrdinalIgnoreCase))
 app.UseAuthorization();
 
 app.MapReverseProxy();
+app.MapHealthChecks("/health");
 app.MapPrometheusScrapingEndpoint();
 
 app.Run();
 
 [ExcludeFromCodeCoverage]
 public partial class Program { }
-
