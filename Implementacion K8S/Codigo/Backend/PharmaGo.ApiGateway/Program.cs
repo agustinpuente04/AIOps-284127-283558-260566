@@ -91,9 +91,9 @@ else if (rateLimitMode.Equals("User", StringComparison.OrdinalIgnoreCase))
 
 app.UseAuthorization();
 
-app.MapReverseProxy();
 app.MapHealthChecks("/health");
 app.MapPrometheusScrapingEndpoint();
+app.MapReverseProxy();
 
 app.Run();
 

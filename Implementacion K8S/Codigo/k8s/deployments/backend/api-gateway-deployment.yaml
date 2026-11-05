@@ -5,6 +5,8 @@ metadata:
   namespace: pharmago
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: pharmago-api-gateway
@@ -26,16 +28,18 @@ spec:
         # Se excluye la propia app para que el RollingUpdate pueda levantar el pod nuevo
         # en el mismo nodo que el viejo sin quedar Pending.
         podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: pharmago.io/tier
-                operator: In
-                values: [microservice]
-              - key: app
-                operator: NotIn
-                values: [pharmago-api-gateway]
-            topologyKey: kubernetes.io/hostname
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: pharmago.io/tier
+                  operator: In
+                  values: [microservice]
+                - key: app
+                  operator: NotIn
+                  values: [pharmago-api-gateway]
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: pharmago-api-gateway
         image: pharmago-api-gateway:latest
