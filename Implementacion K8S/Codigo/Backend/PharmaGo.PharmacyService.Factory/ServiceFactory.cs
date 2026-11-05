@@ -11,7 +11,7 @@ using PharmaGo.IDataAccess;
 using Microsoft.Extensions.Hosting;
 using InstrumentationInterface;
 using Instrumentation;
-
+using PharmaGo.Common.Resilience;
 
 namespace PharmaGo.PharmacyService.Factory
 {
@@ -33,7 +33,9 @@ namespace PharmaGo.PharmacyService.Factory
                 var serviceUrl = configuration["ServiceUrls:UsersService"] ?? "http://127.0.0.1:5001";
                 client.BaseAddress = new Uri(serviceUrl);
                 client.Timeout = TimeSpan.FromSeconds(30);
-            });
+            })
+            .AddPolicyHandler(ResiliencePolicies.GetCircuitBreakerPolicy())
+            .AddPolicyHandler(ResiliencePolicies.GetRetryWithJitterPolicy());
         }
 
         public static void RegisterDataAccessServices(this IServiceCollection serviceCollection, IConfiguration configuration)
@@ -55,14 +57,12 @@ namespace PharmaGo.PharmacyService.Factory
                     sqlOptions => { sqlOptions.MigrationsAssembly("PharmaGo.DataAccess"); });
                 options.ConfigureWarnings(w =>
                 {
-                    w.Ignore(RelationalEventId.CommandExecuted);
-                    w.Ignore(RelationalEventId.CommandError);
+                    w.Ignore(CoreEventId.LazyLoadOnDisposedContextWarning);
                 });
             });
+
             serviceCollection.AddSingleton<ICustomMetrics, CustomMetrics>();
             serviceCollection.AddSingleton<IStructuredLogger, StructuredLogger>();
         }
-
     }
 }
-
