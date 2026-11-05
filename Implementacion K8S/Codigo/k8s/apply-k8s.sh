@@ -154,6 +154,10 @@ kubectl apply -f services/frontend/ui-service.yaml
 kubectl apply -f deployments/frontend/ui-deployment.yaml
 
 echo ""
+echo "10. Aplicando PodDisruptionBudgets (alta disponibilidad)..."
+kubectl apply -f pdb/app-pdbs.yaml
+
+echo ""
 echo "=== Despliegue completado ==="
 echo ""
 echo "Verificando estado de los pods..."
@@ -165,6 +169,8 @@ echo "  ./port-forward.sh"
 echo ""
 echo "O con minikube service:"
 echo "  Frontend:     minikube service pharmago-ui -n pharmago --url"
+echo "                (usar esta URL para la app: balancea entre réplicas y no se corta"
+echo "                 al reemplazar pods; port-forward queda atado a un único pod)"
 echo "  Grafana:      minikube service grafana -n pharmago --url"
 echo "  Kibana:       minikube service kibana -n pharmago --url"
 echo "  Prometheus:   minikube service prometheus -n pharmago --url"

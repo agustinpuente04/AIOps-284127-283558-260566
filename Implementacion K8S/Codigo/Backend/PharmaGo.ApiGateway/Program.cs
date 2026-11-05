@@ -12,6 +12,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMemoryCache();
 builder.Services.AddHealthChecks();
 
+// Apagado ordenado: al recibir SIGTERM (reemplazo del pod) se terminan las requests
+// en curso. preStop (10s) + 25s < terminationGracePeriodSeconds (40s) del Deployment.
+builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(25));
+
 var rateLimitMode = builder.Configuration["RateLimiting:Mode"] ?? "IP";
 
 if (rateLimitMode.Equals("IP", StringComparison.OrdinalIgnoreCase))
@@ -25,6 +29,13 @@ if (rateLimitMode.Equals("IP", StringComparison.OrdinalIgnoreCase))
 
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    // Las conexiones keep-alive quedan fijadas a un pod. Con un idle timeout menor que el
+    // preStop (10s) de los servicios, caducan antes de que el pod viejo se apague.
+    .ConfigureHttpClient((context, handler) =>
+    {
+        handler.PooledConnectionIdleTimeout = TimeSpan.FromSeconds(5);
+        handler.PooledConnectionLifetime = TimeSpan.FromSeconds(30);
+    })
     .AddTransforms(transformBuilder =>
     {
         transformBuilder.AddRequestTransform(context =>
