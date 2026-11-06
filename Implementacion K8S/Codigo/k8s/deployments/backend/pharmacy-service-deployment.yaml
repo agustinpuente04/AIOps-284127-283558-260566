@@ -4,9 +4,15 @@ metadata:
   name: pharmago-pharmacy-service
   namespace: pharmago
 spec:
-  replicas: 1
+  # Alta disponibilidad: 2 réplicas + RollingUpdate sin indisponibilidad.
+  # maxUnavailable: 0 => el pod viejo solo se baja cuando el nuevo está Ready.
+  replicas: 2
+  minReadySeconds: 5
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: pharmago-pharmacy-service
@@ -16,6 +22,8 @@ spec:
         app: pharmago-pharmacy-service
         pharmago.io/tier: microservice
     spec:
+      # preStop (10s) + ShutdownTimeout de .NET (25s) < 40s
+      terminationGracePeriodSeconds: 40
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -40,10 +48,23 @@ spec:
                   operator: NotIn
                   values: [pharmago-pharmacy-service]
               topologyKey: kubernetes.io/hostname
+          # Repartir las réplicas de la misma app entre nodos (preferred: funciona con 1 nodo)
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: pharmago-pharmacy-service
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: pharmago-pharmacy-service
         image: pharmago-pharmacy-service:latest
         imagePullPolicy: Never
+        # Esperar a que kube-proxy saque el pod de los Endpoints antes del SIGTERM,
+        # para no recibir requests nuevas mientras Kestrel se apaga.
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "10"]
         ports:
         - containerPort: 80
         env:

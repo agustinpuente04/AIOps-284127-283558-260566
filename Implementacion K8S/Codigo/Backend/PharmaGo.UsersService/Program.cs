@@ -7,6 +7,10 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Logging.SuppressEfAndSqlClientLogs();
 
+// Apagado ordenado: al recibir SIGTERM (reemplazo del pod) se terminan las requests
+// en curso. preStop (10s) + 25s < terminationGracePeriodSeconds (40s) del Deployment.
+builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(25));
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.RegisterBusinessLogicServices(builder.Configuration);
 builder.Services.RegisterDataAccessServices(builder.Configuration);

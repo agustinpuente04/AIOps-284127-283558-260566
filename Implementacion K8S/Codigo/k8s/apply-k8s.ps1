@@ -152,12 +152,18 @@ kubectl apply -f deployments\frontend\ui-deployment.yaml
 
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
+Write-Host "`n10. Aplicando PodDisruptionBudgets (alta disponibilidad)..." -ForegroundColor Yellow
+kubectl apply -f pdb\app-pdbs.yaml
+
+if ($LASTEXITCODE -ne 0) { exit 1 }
+
 Write-Host "`n=== Despliegue completado ===" -ForegroundColor Green
 Write-Host "`nVerificando estado de los pods..." -ForegroundColor Yellow
 kubectl get pods -n pharmago -o wide
 
 Write-Host "`nPara ver los servicios expuestos:" -ForegroundColor Cyan
 Write-Host "  Frontend:     minikube service pharmago-ui -n pharmago --url" -ForegroundColor White
+Write-Host "                (usar esta URL para la app: balancea entre replicas y no se corta al reemplazar pods)" -ForegroundColor Gray
 Write-Host "  Grafana:      minikube service grafana -n pharmago --url" -ForegroundColor White
 Write-Host "  Kibana:       minikube service kibana -n pharmago --url" -ForegroundColor White
 Write-Host "  Prometheus:   minikube service prometheus -n pharmago --url" -ForegroundColor White
