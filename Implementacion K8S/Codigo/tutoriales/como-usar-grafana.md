@@ -1,5 +1,27 @@
 # Configuración de Grafana - PharmaGo
 
+## ☸️ En Kubernetes (despliegue actual)
+
+```bash
+cd k8s && ./port-forward.sh     # Grafana en http://127.0.0.1:3000  (admin / admin)
+```
+
+Todo se carga por provisioning al arrancar el pod, sin pasos manuales:
+
+| Qué | Dónde se define |
+|---|---|
+| Datasource Prometheus | `k8s/configmaps/grafana-provisioning.yaml` |
+| Dashboard **PharmaGo - Infra** (nodo y pods: CPU, memoria, storage, red) | `k8s/configmaps/grafana-dashboard-infra.yaml` |
+| Dashboard **PharmaGo - Overview** (HTTP: tráfico, latencia, errores, 429) | `k8s/configmaps/grafana-dashboards.yaml` |
+| Dashboard **PharmaGo - Negocio y Runtime** (logins, compras, stock requests, requests en curso, circuit breaker, runtime .NET) | `k8s/configmaps/grafana-dashboard-app.yaml` |
+| **10 alertas** de anomalías y contact point Discord | `k8s/configmaps/grafana-alerting.yaml` |
+
+- **Alertas**: menú ☰ → **Alerting → Alert rules**, carpeta *PharmaGo*. Cada regla pasa por *Normal → Pending → Firing*. Las notificaciones van al webhook de Discord configurado con `ALERT_WEBHOOK_URL`.
+- **Modificar un dashboard**: editar el JSON dentro del ConfigMap, `kubectl apply -f` y `kubectl rollout restart deployment/grafana -n pharmago`. El ConfigMap se monta con `subPath`, que no se recarga solo. Los cambios hechos desde la UI se pierden al reiniciar el pod.
+- Detalle de cada métrica, las queries y la lista de alertas: [observabilidad/README.md](observabilidad/README.md).
+
+La sección siguiente describe el stack legado de **Docker Compose**, que no incluye los dashboards ni las alertas nuevas.
+
 ## 🎯 Configuración Automática
 
 Grafana se configura automáticamente al levantar Docker Compose. No necesitas hacer nada manualmente.

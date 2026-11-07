@@ -1,25 +1,22 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using InstrumentationInterface;
 
 namespace Instrumentation
 {
-    /// <summary>
-    /// Middleware que captura automáticamente métricas de todos los endpoints:
-    /// - Cantidad de invocaciones por endpoint
-    /// - Latencia/duración de cada request
-    /// - Tasa de errores (status codes 4xx y 5xx)
-    /// </summary>
     public class MetricsMiddleware
     {
         private readonly RequestDelegate _next;
         private readonly ICustomMetrics _metrics;
+        private readonly ILogger<MetricsMiddleware> _logger;
 
-        public MetricsMiddleware(RequestDelegate next, ICustomMetrics metrics)
+        public MetricsMiddleware(RequestDelegate next, ICustomMetrics metrics, ILogger<MetricsMiddleware> logger)
         {
             _next = next;
             _metrics = metrics;
+            _logger = logger;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -28,17 +25,20 @@ namespace Instrumentation
             var endpoint = context.Request.Path.Value ?? "/";
             var method = context.Request.Method;
 
+            // Saturación: requests que están siendo procesadas en este momento.
+            _metrics.ChangeRequestsInFlight(1);
             try
             {
                 await _next(context);
                 stopwatch.Stop();
 
-                // Registrar la petición exitosa
                 var statusCode = context.Response.StatusCode;
                 _metrics.RecordHttpRequest(endpoint, method, statusCode);
                 _metrics.RecordEndpointDuration(endpoint, method, stopwatch.Elapsed.TotalMilliseconds);
 
-                // Registrar como error si el status code es 4xx o 5xx
+                _logger.LogInformation("HTTP {Method} {Endpoint} responded {StatusCode} in {ElapsedMs} ms", 
+                    method, endpoint, statusCode, stopwatch.Elapsed.TotalMilliseconds);
+
                 if (statusCode >= 400)
                 {
                     var errorType = statusCode >= 500 ? "server_error" : "client_error";
@@ -48,21 +48,18 @@ namespace Instrumentation
             catch (Exception ex)
             {
                 stopwatch.Stop();
-
-                // Registrar la excepción
                 _metrics.RecordHttpRequest(endpoint, method, 500);
-                _metrics.RecordEndpointDuration(endpoint, method, stopwatch.Elapsed.TotalMilliseconds);
-                _metrics.RecordError(endpoint, ex.GetType().Name);
-
-                // Re-lanzar la excepción para que sea manejada por otros middlewares
+                _metrics.RecordError(endpoint, "unhandled_exception");
+                _logger.LogError(ex, "HTTP {Method} {Endpoint} failed with exception", method, endpoint);
                 throw;
+            }
+            finally
+            {
+                _metrics.ChangeRequestsInFlight(-1);
             }
         }
     }
 
-    /// <summary>
-    /// Extension method para registrar el middleware fácilmente
-    /// </summary>
     public static class MetricsMiddlewareExtensions
     {
         public static IApplicationBuilder UseMetricsMiddleware(this IApplicationBuilder builder)
@@ -71,4 +68,3 @@ namespace Instrumentation
         }
     }
 }
-

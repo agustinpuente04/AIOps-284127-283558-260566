@@ -15,11 +15,13 @@ namespace PharmaGo.PharmacyService.Controllers
     {
         private readonly IPurchasesManager _purchasesManager;
         private readonly IStructuredLogger _structuredLogger;
+        private readonly ICustomMetrics _customMetrics;
 
-        public PurchasesController(IPurchasesManager manager, IStructuredLogger structuredLogger)
+        public PurchasesController(IPurchasesManager manager, IStructuredLogger structuredLogger, ICustomMetrics customMetrics)
         {
             _purchasesManager = manager;
             _structuredLogger = structuredLogger;
+            _customMetrics = customMetrics;
         }
 
         [HttpGet]
@@ -83,6 +85,7 @@ namespace PharmaGo.PharmacyService.Controllers
                         ["tracking_code"] = purchase.TrackingCode,
                         ["buyer_email"] = purchase.BuyerEmail
                     });
+                _customMetrics.RecordPurchase("success", purchase.TotalAmount);
                 var purchaseModelResponse = new PurchaseModelResponse(purchase);
                 return Ok(purchaseModelResponse);
             }
@@ -99,6 +102,7 @@ namespace PharmaGo.PharmacyService.Controllers
                         ["outcome"] = "failed",
                         ["buyer_email"] = purchaseModel?.BuyerEmail ?? ""
                     });
+                _customMetrics.RecordPurchase("failed", 0);
                 throw;
             }
         }

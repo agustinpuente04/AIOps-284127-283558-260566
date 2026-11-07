@@ -52,6 +52,13 @@ spec:
           value: "admin"
         - name: GF_INSTALL_PLUGINS
           value: ""
+        # URL del webhook de Discord para las alertas (configmaps/grafana-alerting.yaml la usa
+        # como $ALERT_WEBHOOK_URL). El Secret lo crean apply-k8s.sh / apply-k8s.ps1.
+        - name: ALERT_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: grafana-alerting
+              key: webhook_url
         volumeMounts:
         - name: grafana-storage
           mountPath: /var/lib/grafana
@@ -67,6 +74,12 @@ spec:
         - name: grafana-dashboard-infra
           mountPath: /etc/grafana/provisioning/dashboards/pharmago-infra.json
           subPath: pharmago-infra.json
+        - name: grafana-dashboard-app
+          mountPath: /etc/grafana/provisioning/dashboards/pharmago-app.json
+          subPath: pharmago-app.json
+        - name: grafana-alerting
+          mountPath: /etc/grafana/provisioning/alerting/alerting.yaml
+          subPath: alerting.yaml
         resources:
           requests:
             memory: "256Mi"
@@ -108,4 +121,10 @@ spec:
       - name: grafana-dashboard-infra
         configMap:
           name: grafana-dashboard-infra
+      - name: grafana-dashboard-app
+        configMap:
+          name: grafana-dashboard-app
+      - name: grafana-alerting
+        configMap:
+          name: grafana-alerting
 

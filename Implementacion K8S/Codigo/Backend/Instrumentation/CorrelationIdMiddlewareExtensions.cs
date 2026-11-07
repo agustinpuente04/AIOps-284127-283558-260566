@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Instrumentation;
@@ -9,9 +10,6 @@ public static class CorrelationIdMiddlewareExtensions
 {
     public const string HttpContextItemKey = "YarpCorrelationId";
 
-    /// <summary>
-    /// Ensures X-Correlation-ID exists, exposes it on the response, and stores it for YARP outbound transforms.
-    /// </summary>
     public static IApplicationBuilder UseGatewayCorrelationId(this IApplicationBuilder app)
     {
         return app.Use(async (context, next) =>
@@ -22,13 +20,20 @@ public static class CorrelationIdMiddlewareExtensions
                 : header.Trim();
             context.Items[HttpContextItemKey] = correlationId;
             context.Response.Headers["X-Correlation-ID"] = correlationId;
-            await next();
+
+            var loggerFactory = context.RequestServices.GetRequiredService<ILoggerFactory>();
+            var log = loggerFactory.CreateLogger("GatewayRequest");
+            using (log.BeginScope(new Dictionary<string, object> 
+            { 
+                ["correlation_id"] = correlationId,
+                ["service"] = "PharmaGo.ApiGateway"
+            }))
+            {
+                await next();
+            }
         });
     }
 
-    /// <summary>
-    /// Adds correlation_id to log scopes (from X-Correlation-ID when the gateway forwarded it, else TraceIdentifier).
-    /// </summary>
     public static IApplicationBuilder UseServiceCorrelationScope(this IApplicationBuilder app)
     {
         return app.Use(async (context, next) =>
@@ -39,10 +44,17 @@ public static class CorrelationIdMiddlewareExtensions
                 : header.Trim();
             context.Items[HttpContextItemKey] = correlationId;
 
+            var env = context.RequestServices.GetRequiredService<IHostEnvironment>();
             var loggerFactory = context.RequestServices.GetRequiredService<ILoggerFactory>();
-            var log = loggerFactory.CreateLogger("Request");
-            using (log.BeginScope(new Dictionary<string, object> { ["correlation_id"] = correlationId }))
+            var log = loggerFactory.CreateLogger("ServiceRequest");
+            using (log.BeginScope(new Dictionary<string, object> 
+            { 
+                ["correlation_id"] = correlationId,
+                ["service"] = env.ApplicationName
+            }))
+            {
                 await next();
+            }
         });
     }
 }

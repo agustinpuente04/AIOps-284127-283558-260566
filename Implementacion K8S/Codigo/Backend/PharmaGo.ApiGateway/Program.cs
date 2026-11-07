@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
 using AspNetCoreRateLimit;
 using PharmaGo.ApiGateway.Middleware;
@@ -53,15 +54,29 @@ builder.Services.AddReverseProxy()
 
 builder.Services.AddSingleton<ICustomMetrics, CustomMetrics>();
 
+var otlpEndpoint = builder.Configuration["Otlp:Endpoint"] ?? "http://otlp-collector:4317";
+
 builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("PharmaGo.ApiGateway"))
     .WithMetrics(metricsBuilder => 
     {
         metricsBuilder
-            .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("PharmaGo.ApiGateway"))
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
             .AddMeter("PharmaGo.CustomMetrics")
-            .AddPrometheusExporter();
+            .AddPrometheusExporter()
+            // Mismo camino que users/pharmacy: app -> OTLP -> collector -> Prometheus.
+            // Cada réplica exporta con su propio service.instance.id (el scrape directo
+            // de /metrics vía Service mezcla réplicas).
+            .AddOtlpExporter(opts => opts.Endpoint = new Uri(otlpEndpoint));
+    })
+    .WithTracing(tracingBuilder =>
+    {
+        tracingBuilder
+            .AddAspNetCoreInstrumentation(opts => opts.RecordException = true)
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(opts => opts.Endpoint = new Uri(otlpEndpoint));
     });
 
 builder.Services.AddEndpointsApiExplorer();

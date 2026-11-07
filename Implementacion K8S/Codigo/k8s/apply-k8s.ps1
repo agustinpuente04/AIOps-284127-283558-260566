@@ -42,12 +42,25 @@ Write-Host "`n3. Creando secrets..." -ForegroundColor Yellow
 kubectl apply -f secrets\db-secret.yaml
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
+# Webhook de Discord para las alertas de Grafana. La URL no se versiona: se toma de la variable
+# de entorno ALERT_WEBHOOK_URL ($env:ALERT_WEBHOOK_URL = "https://discord.com/api/webhooks/...").
+# Sin ella se usa un placeholder: las alertas se evalúan y se ven en Grafana, pero no se envían.
+$webhook = $env:ALERT_WEBHOOK_URL
+if ([string]::IsNullOrEmpty($webhook)) {
+    Write-Host "   ALERT_WEBHOOK_URL no definida: las alertas no se enviaran a Discord (solo se veran en Grafana)." -ForegroundColor Cyan
+    $webhook = "http://127.0.0.1:9/disabled"
+}
+kubectl create secret generic grafana-alerting -n pharmago --from-literal=webhook_url="$webhook" --dry-run=client -o yaml | kubectl apply -f -
+if ($LASTEXITCODE -ne 0) { exit 1 }
+
 Write-Host "`n4. Creando configmaps..." -ForegroundColor Yellow
 kubectl apply -f configmaps\prometheus-config.yaml
 kubectl apply -f configmaps\otel-collector-config.yaml
 kubectl apply -f configmaps\grafana-provisioning.yaml
 kubectl apply -f configmaps\grafana-dashboards.yaml
 kubectl apply -f configmaps\grafana-dashboard-infra.yaml
+kubectl apply -f configmaps\grafana-dashboard-app.yaml
+kubectl apply -f configmaps\grafana-alerting.yaml
 kubectl apply -f configmaps\fluent-bit-config.yaml
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
@@ -128,6 +141,8 @@ kubectl apply -f deployments\ops\node-exporter-daemonset.yaml
 
 kubectl apply -f services\ops\grafana-service.yaml
 kubectl apply -f deployments\ops\grafana-deployment.yaml
+# Los dashboards y alertas se montan con subPath, que no se actualiza solo al cambiar el ConfigMap.
+kubectl rollout restart deployment/grafana -n pharmago
 
 kubectl apply -f services\ops\kibana-service.yaml
 kubectl apply -f deployments\ops\kibana-deployment.yaml

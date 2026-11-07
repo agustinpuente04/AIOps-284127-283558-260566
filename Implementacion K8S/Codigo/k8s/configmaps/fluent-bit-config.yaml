@@ -8,7 +8,7 @@ metadata:
 data:
   fluent-bit.conf: |
     [SERVICE]
-        Flush         5
+        Flush         2
         Log_Level     info
         Daemon        off
         Parsers_File  parsers.conf
@@ -28,13 +28,11 @@ data:
         Parser            docker
         DB                /var/log/flb_kube.db
         Mem_Buf_Limit     5MB
-        # JSON app logs (scopes, State) are often longer than SQL fragments; skipping them removes Message/Category from ES.
         Skip_Long_Lines   Off
         Buffer_Max_Size   1MB
-        # Reensambla líneas partidas por el driver de logs de Docker (>~16KB) en un solo registro.
         Docker_Mode       On
         Docker_Mode_Flush 5
-        Refresh_Interval   10
+        Refresh_Interval   5
 
   filter-kubernetes.conf: |
     [FILTER]
@@ -44,13 +42,10 @@ data:
         Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
         Kube_Tag_Prefix     kube.var.log.containers.
-        # Merge_Log off: EF SQL and other plain lines stay only in "log". JSON app lines are lifted by parser below.
         Merge_Log           Off
         K8S-Logging.Parser  On
         K8S-Logging.Exclude  Off
 
-    # When "log" is a single-line JSON object (.NET console JSON), lift Message, Category, LogLevel, etc. to top-level for KQL.
-    # Non-JSON lines (e.g. SQL) are unchanged — no "Message" field, so they do not match Message-based queries.
     [FILTER]
         Name                parser
         Match               kube.*

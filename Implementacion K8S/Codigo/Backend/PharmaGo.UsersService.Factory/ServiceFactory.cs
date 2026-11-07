@@ -31,8 +31,8 @@ namespace PharmaGo.UsersService.Factory
                 client.BaseAddress = new Uri(serviceUrl);
                 client.Timeout = TimeSpan.FromSeconds(30);
             })
-            .AddPolicyHandler(ResiliencePolicies.GetCircuitBreakerPolicy())
-            .AddPolicyHandler(ResiliencePolicies.GetRetryWithJitterPolicy());
+            .AddPolicyHandler(ResiliencePolicies.GetCircuitBreakerPolicy("pharmacy-service"))
+            .AddPolicyHandler(ResiliencePolicies.GetRetryWithJitterPolicy("pharmacy-service"));
         }
 
         public static void RegisterDataAccessServices(this IServiceCollection serviceCollection, IConfiguration configuration)
