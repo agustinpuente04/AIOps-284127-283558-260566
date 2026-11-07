@@ -59,3 +59,12 @@ k8s/.port-forward.pids
 docker-compose.override.yml
 
 .port-forward.pids
+
+# === graphify (grafo local, se regenera con los hooks de git) ===
+graphify-out/
+
+# === Claude Code / graphify (configuración local, cada quien la instala con graphify install --project) ===
+.claude/
+CLAUDE.md
+.graphifyignore
+.gitattributes
