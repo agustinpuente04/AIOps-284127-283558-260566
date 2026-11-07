@@ -1,3 +1,4 @@
+using InstrumentationInterface;
 using Microsoft.AspNetCore.Mvc;
 using PharmaGo.Domain.Entities;
 using PharmaGo.Exceptions;
@@ -14,10 +15,12 @@ namespace PharmaGo.PharmacyService.Controllers
     public class StockRequestController : ControllerBase
     {
         private readonly IStockRequestManager _stockRequestManager;
+        private readonly ICustomMetrics _customMetrics;
 
-        public StockRequestController(IStockRequestManager manager)
+        public StockRequestController(IStockRequestManager manager, ICustomMetrics customMetrics)
         {
             _stockRequestManager = manager;
+            _customMetrics = customMetrics;
         }
 
         [HttpPost]
@@ -25,7 +28,7 @@ namespace PharmaGo.PharmacyService.Controllers
         public IActionResult CreateStockRequest([FromBody] StockRequestModelRequest stockRequestModel)
         {
             string token = HttpContext.Request.Headers["Authorization"];
-            var stockRequest = _stockRequestManager.CreateStockRequest(stockRequestModel.ToEntity(), token);
+            var stockRequest = Track("create", () => _stockRequestManager.CreateStockRequest(stockRequestModel.ToEntity(), token));
             return Ok(new StockRequestModelResponse(stockRequest));
         }
 
@@ -34,7 +37,7 @@ namespace PharmaGo.PharmacyService.Controllers
         [Route("[action]/{id}")]
         public IActionResult ApproveStockRequest(int id)
         {
-            var approved = _stockRequestManager.ApproveStockRequest(id);
+            var approved = Track("approve", () => _stockRequestManager.ApproveStockRequest(id));
             return Ok(approved);
         }
 
@@ -43,8 +46,27 @@ namespace PharmaGo.PharmacyService.Controllers
         [AuthorizationFilter(new string[] { nameof(RoleType.Owner) })]
         public IActionResult RejectStockRequest(int id)
         {
-            var approved = _stockRequestManager.RejectStockRequest(id);
+            var approved = Track("reject", () => _stockRequestManager.RejectStockRequest(id));
             return Ok(approved);
+        }
+
+        /// <summary>
+        /// Ejecuta la operación y registra pharmago_stock_requests_total{action, outcome}.
+        /// La excepción se relanza para que la maneje el ExceptionFilter como antes.
+        /// </summary>
+        private T Track<T>(string action, Func<T> operation)
+        {
+            try
+            {
+                var result = operation();
+                _customMetrics.RecordStockRequest(action, "success");
+                return result;
+            }
+            catch
+            {
+                _customMetrics.RecordStockRequest(action, "failed");
+                throw;
+            }
         }
 
         [HttpGet]

@@ -63,8 +63,13 @@ builder.Services.AddOpenTelemetry()
         metricsBuilder
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
             .AddMeter("PharmaGo.CustomMetrics")
-            .AddPrometheusExporter();
+            .AddPrometheusExporter()
+            // Mismo camino que users/pharmacy: app -> OTLP -> collector -> Prometheus.
+            // Cada réplica exporta con su propio service.instance.id (el scrape directo
+            // de /metrics vía Service mezcla réplicas).
+            .AddOtlpExporter(opts => opts.Endpoint = new Uri(otlpEndpoint));
     })
     .WithTracing(tracingBuilder =>
     {

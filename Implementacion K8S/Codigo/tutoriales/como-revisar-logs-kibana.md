@@ -70,47 +70,105 @@ kubernetes.labels.app: "pharmago-users-service"
 ```
 o por namespace: `kubernetes.namespace_name: "pharmago"`
 
-### 3. Buscar Logs de Login
+### 3. Estructura real de un documento (verificado 2026-11-06)
 
-Los mensajes del backend son:
-- Éxito: `User X logged in successfully`
-- Fallo: `User X failed log in`
+Los logs de los servicios .NET se emiten como una línea JSON (`Logging:Console:FormatterName: json` en cada `appsettings.json`). Fluent Bit la parsea (`dotnet_console_json` en `parsers.conf`) y **reemplaza** el campo `log` original por sus campos: en los documentos ya no existe un campo `log` de texto para los logs de la app (las búsquedas tipo `log:*logged*` de versiones anteriores de esta guía **no devuelven nada** con los logs estructurados actuales; solo seguían funcionando con líneas que no son JSON, como las de SQL).
 
-**En Kibana**, Elasticsearch tokeniza el texto; palabras como "in" pueden ignorarse. Prueba:
+Documento real de un login correcto (`PharmaGo.UsersService`, vía `IStructuredLogger`):
+
+```json
+{
+  "@timestamp": "2026-11-07T00:49:49.808Z",
+  "LogLevel": "Information",
+  "Category": "Instrumentation.StructuredLogger",
+  "Message": "Login succeeded pharma_biz=login_success EVTLGOK correlation_id=1ba945ee-...",
+  "Scopes": [
+    { "SpanId": "...", "TraceId": "...", "ParentId": "..." },
+    { "ConnectionId": "..." },
+    { "RequestId": "...", "RequestPath": "/api/login" },
+    { "correlation_id": "1ba945ee-...", "service": "PharmaGo.UsersService" },
+    {
+      "timestamp_utc": "...", "level": "info", "service": "PharmaGo.UsersService",
+      "correlation_id": "1ba945ee-...", "pharma_biz": "login_success",
+      "component": "LoginController", "operation": "login", "outcome": "success",
+      "user_name": "admin", "user_id": 1
+    }
+  ],
+  "kubernetes": { "pod_name": "...", "labels": { "app": "pharmago-users-service" } }
+}
+```
+
+Campos útiles para buscar/filtrar en Kibana:
+
+| Campo | Qué es |
+|---|---|
+| `Message` | Mensaje legible (incluye `pharma_biz=...` y el token `EVT...` para búsqueda exacta) |
+| `Category` | Clase que logueó: `Instrumentation.StructuredLogger` (eventos de negocio) o `Instrumentation.MetricsMiddleware` (una línea por cada request HTTP) |
+| `Scopes.pharma_biz` | Tipo de evento de negocio: `login_success`, `login_fail`, `purchase_create`, `purchase_create_fail` |
+| `Scopes.component` / `Scopes.operation` / `Scopes.outcome` | Quién generó el evento y si salió bien o mal |
+| `Scopes.user_name` / `Scopes.user_id` | Usuario involucrado |
+| `Scopes.correlation_id` | ID que viaja desde el API Gateway hasta el microservicio — une todos los logs de una misma request entre servicios |
+| `kubernetes.labels.app` | Qué servicio/pod generó el log |
+| `Exception` | Stack trace completo, solo en los `LogWarning`/`LogError` con excepción |
+
+> Los campos de `Scopes.*` están mapeados como texto + `.keyword` (lo mismo que `Message` y `Category`), así que sirven para búsquedas exactas o con comodines.
+
+### 4. Buscar Logs de Login
+
+**KQL (por defecto en la barra de búsqueda de Discover):**
 
 ```
-# Opción 1: wildcards (más fiable)
-log: *logged* or log: *failed*
-
-# Opción 2: si el campo es "message"
-message: *logged* or message: *failed*
-
-# Opción 3: Lucene (cambiar KQL → Lucene en el selector de la barra)
-log:*logged* OR log:*failed*
+Scopes.pharma_biz : "login_success"
+Scopes.pharma_biz : "login_fail"
+Scopes.pharma_biz : "login_success" or Scopes.pharma_biz : "login_fail"
 ```
 
-Si no encuentra nada, abre un documento de log para ver en qué campo está el texto real (`log`, `message`, `msg`, etc.) y usa ese campo.
+**Por usuario específico:**
 
-**Test rápido:** Llama al login y comprueba que los logs aparecen:
-1. Haz login en la app (http://127.0.0.1:4200) o llama al API:
-   ```powershell
-   Invoke-RestMethod -Uri "http://127.0.0.1:5000/api/login" -Method POST -ContentType "application/json" -Body '{"userName":"admin@pharmago.com","password":"Str0ngP@ssword!"}'
+```
+Scopes.pharma_biz : "login_fail" and Scopes.user_name : "admin"
+```
+
+**Lucene** (si cambiás el selector KQL → Lucene en la barra), usando el token corto pensado para esto:
+
+```
+Message:EVTLGOK   # logins exitosos
+Message:EVTLGFL   # logins fallidos
+```
+
+**Test rápido:** Llama al login y comprueba que el log aparece:
+1. Desde la terminal (reemplazá `$URL` por la que te da `minikube service pharmago-ui -n pharmago --url`):
+   ```bash
+   curl -X POST "$URL/api/login" -H "Content-Type: application/json" \
+     -d '{"userName":"admin","password":"Abcdef12."}'
    ```
-2. En Kibana, abre **Discover**, selecciona el data view `pharmago-logs`.
-3. En la barra de búsqueda, cambia a **Lucene** y usa: `log:*logged* OR log:*failed*`
-4. Deberías ver el log "User X logged in successfully" o "User X failed log in".
+   (usuario de prueba `admin` / `Abcdef12.` cargado por `Backend/seed-data.sql`)
+2. En Kibana, abre **Discover**, data view `pharmago-logs` (ya debería estar seleccionado por defecto).
+3. Busca `Scopes.pharma_biz : "login_success"` y ajusta el rango de tiempo arriba a la derecha (p. ej. "Last 15 minutes").
+4. Deberías ver el documento con `Message: "Login succeeded pharma_biz=login_success EVTLGOK ..."`.
 
-### 4. Búsquedas Avanzadas
+### 5. Seguir una request de punta a punta (correlation_id)
+
+Abrí cualquier documento y copiá `Scopes.correlation_id` (el del último scope, el de `StructuredLogger`/`CorrelationIdMiddlewareExtensions`). Buscando ese valor exacto aparecen **todos** los logs de esa request, en el gateway y en el microservicio, en orden:
 
 ```
-# Buscar errores
-log: *Error* OR log: *Exception*
+Scopes.correlation_id : "1ba945ee-55f0-4800-b500-d884ed27857a"
+```
 
-# Buscar por nivel
-log: *Warning* OR log: *Error*
+### 6. Búsquedas Avanzadas
 
-# Combinar con servicio (filtrar en la columna kubernetes.labels.app)
-log: *Rate limit*
+```
+# Errores (con o sin stack trace)
+LogLevel: "Error" or LogLevel: "Warning"
+
+# Solo eventos de negocio (ignora las líneas de MetricsMiddleware/EF/framework)
+Category: "Instrumentation.StructuredLogger"
+
+# Un servicio puntual
+kubernetes.labels.app : "pharmago-pharmacy-service"
+
+# Requests lentas del gateway/servicios (campo numérico, State.ElapsedMs)
+State.ElapsedMs > 500
 ```
 
 ### 5. Verificar Logs en Elasticsearch

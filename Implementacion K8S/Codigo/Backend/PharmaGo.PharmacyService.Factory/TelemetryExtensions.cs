@@ -17,6 +17,7 @@ namespace PharmaGo.PharmacyService.Factory
                         metricsBuilder
                             .AddAspNetCoreInstrumentation()
                             .AddHttpClientInstrumentation()
+                            .AddRuntimeInstrumentation()
                             .AddMeter("PharmaGo.CustomMetrics")
                             .AddPrometheusExporter()
                             .AddOtlpExporter(options =>

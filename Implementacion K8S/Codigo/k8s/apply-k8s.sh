@@ -37,6 +37,16 @@ echo ""
 echo "3. Creando secrets..."
 kubectl apply -f secrets/db-secret.yaml
 
+# Webhook de Discord para las alertas de Grafana. La URL no se versiona: se toma de la variable
+# ALERT_WEBHOOK_URL de tu shell (export ALERT_WEBHOOK_URL=https://discord.com/api/webhooks/...).
+# Sin ella se usa un placeholder: las alertas se evalúan y se ven en Grafana, pero no se envían.
+if [ -z "$ALERT_WEBHOOK_URL" ]; then
+    echo "   ALERT_WEBHOOK_URL no definida: las alertas no se enviarán a Discord (solo se verán en Grafana)."
+fi
+kubectl create secret generic grafana-alerting -n pharmago \
+    --from-literal=webhook_url="${ALERT_WEBHOOK_URL:-http://127.0.0.1:9/disabled}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
 echo ""
 echo "4. Creando configmaps..."
 kubectl apply -f configmaps/prometheus-config.yaml
@@ -44,6 +54,8 @@ kubectl apply -f configmaps/otel-collector-config.yaml
 kubectl apply -f configmaps/grafana-provisioning.yaml
 kubectl apply -f configmaps/grafana-dashboards.yaml
 kubectl apply -f configmaps/grafana-dashboard-infra.yaml
+kubectl apply -f configmaps/grafana-dashboard-app.yaml
+kubectl apply -f configmaps/grafana-alerting.yaml
 kubectl apply -f configmaps/fluent-bit-config.yaml
 
 echo ""
@@ -127,6 +139,8 @@ kubectl apply -f deployments/ops/node-exporter-daemonset.yaml
 
 kubectl apply -f services/ops/grafana-service.yaml
 kubectl apply -f deployments/ops/grafana-deployment.yaml
+# Los dashboards y alertas se montan con subPath, que no se actualiza solo al cambiar el ConfigMap.
+kubectl rollout restart deployment/grafana -n pharmago
 
 kubectl apply -f services/ops/kibana-service.yaml
 kubectl apply -f deployments/ops/kibana-deployment.yaml

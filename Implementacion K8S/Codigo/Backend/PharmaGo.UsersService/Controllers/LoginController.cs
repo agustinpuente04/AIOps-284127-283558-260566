@@ -41,7 +41,8 @@ namespace PharmaGo.UsersService.Controllers
                         ["user_name"] = authorization.UserName,
                         ["user_id"] = authorization.UserId
                     });
-                
+                _customMetrics.RecordLogin("success");
+
                 return Ok(new LoginModelResponse() { token = authorization.Token, role = authorization.Role, userName = authorization.UserName });
             }
             catch (Exception ex)
@@ -57,7 +58,8 @@ namespace PharmaGo.UsersService.Controllers
                         ["outcome"] = "failed",
                         ["user_name"] = userModel.UserName ?? "unknown"
                     });
-                
+                _customMetrics.RecordLogin("failed");
+
                 throw;
             }
         }

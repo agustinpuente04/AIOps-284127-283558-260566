@@ -25,6 +25,8 @@ namespace Instrumentation
             var endpoint = context.Request.Path.Value ?? "/";
             var method = context.Request.Method;
 
+            // Saturación: requests que están siendo procesadas en este momento.
+            _metrics.ChangeRequestsInFlight(1);
             try
             {
                 await _next(context);
@@ -50,6 +52,10 @@ namespace Instrumentation
                 _metrics.RecordError(endpoint, "unhandled_exception");
                 _logger.LogError(ex, "HTTP {Method} {Endpoint} failed with exception", method, endpoint);
                 throw;
+            }
+            finally
+            {
+                _metrics.ChangeRequestsInFlight(-1);
             }
         }
     }
