@@ -1,4 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: 'http://127.0.0.1:5000'
+  // URL relativa: nginx (pharmago-ui) hace de proxy de /api hacia el API Gateway.
+  apiUrl: ''
 };

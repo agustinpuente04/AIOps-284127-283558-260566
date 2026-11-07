@@ -178,13 +178,17 @@ Servicios disponibles en:
 
 Para detener: `./port-forward.sh --stop`
 
+> ⚠️ **port-forward se conecta a un único pod.** Cuando ese pod se reemplaza (rollout, reinicio o falla), el túnel se corta aunque haya otras réplicas sanas. Para usar la aplicación con alta disponibilidad, usa la Opción 2 para el frontend. Port-forward queda para herramientas de debug (BD, Prometheus, etc.).
+
 ### Opción 2: Minikube service
 
-### Frontend
+### Frontend (punto de entrada de la aplicación)
 
 ```bash
 minikube service pharmago-ui -n pharmago --url
 ```
+
+El nginx de `pharmago-ui` hace de proxy de `/api/*` hacia el Service `pharmago-api-gateway`, así que el navegador solo necesita esta URL.
 
 ### Grafana
 
