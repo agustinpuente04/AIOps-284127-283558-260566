@@ -220,6 +220,63 @@ Luego aplica los cambios:
 kubectl apply -f deployments/<component>/<deployment>.yaml
 ```
 
+> Los componentes de aplicación (UI, gateway, users, pharmacy) necesitan **al menos 2 réplicas** para cumplir con la alta disponibilidad. Con 1 réplica, el PodDisruptionBudget bloquearía `kubectl drain`.
+
+## Alta disponibilidad: reemplazo de componentes sin downtime
+
+**Requisito:** el sistema debe poder reemplazar sus componentes garantizando 100% de disponibilidad.
+
+### Cómo se cumple
+
+| Mecanismo | Dónde | Qué garantiza |
+|---|---|---|
+| `replicas: 2` | Deployments de UI, gateway, users y pharmacy | Siempre hay otra réplica sirviendo si se pierde un pod |
+| `RollingUpdate` con `maxSurge: 1`, `maxUnavailable: 0` y `minReadySeconds: 5` | Mismos Deployments | El pod viejo solo se baja cuando el nuevo pasó la readiness probe |
+| `readinessProbe` y `startupProbe` en `/health` | Mismos Deployments | Un pod no recibe tráfico hasta estar listo |
+| `preStop: sleep 10` | Mismos Deployments | kube-proxy saca el pod de los Endpoints **antes** de que reciba SIGTERM |
+| `HostOptions.ShutdownTimeout = 25s` | `Program.cs` de los 3 servicios .NET | Las requests en curso terminan antes de que se cierre el proceso |
+| `terminationGracePeriodSeconds: 40` (backend) / `30` (UI) | Deployments | Margen > preStop + apagado ordenado |
+| `PooledConnectionIdleTimeout = 5s` en YARP | `PharmaGo.ApiGateway/Program.cs` | Las conexiones keep-alive hacia un pod que se va caducan durante su preStop |
+| `keepalive_timeout 5s` | `Frontend/nginx.conf` | Lo mismo para las conexiones navegador → UI |
+| PodDisruptionBudget `minAvailable: 1` | `pdb/app-pdbs.yaml` | Un `drain` o una eviction nunca deja una app sin réplicas |
+| Anti-afinidad *preferred* por app | Deployments | Si hay varios nodos, las réplicas se reparten entre ellos |
+| nginx proxy `/api/` → Service del gateway | `Frontend/nginx.conf` | Único punto de entrada estable (NodePort que balancea entre réplicas) |
+
+Secuencia al reemplazar un pod: pod nuevo → `startup` y `readiness` OK → entra a los Endpoints → pod viejo pasa a `Terminating` → sale de los Endpoints y espera el preStop de 10 s → SIGTERM → termina las requests en curso → fin.
+
+### Actualizar un componente sin downtime
+
+Como las imágenes usan `:latest` con `imagePullPolicy: Never`, después de reconstruir y cargar una imagen nueva hay que forzar el rollout:
+
+```bash
+./build-images.sh          # o build-images.ps1
+kubectl rollout restart deployment/pharmago-api-gateway -n pharmago
+kubectl rollout status  deployment/pharmago-api-gateway -n pharmago
+```
+
+### Verificación
+
+```bash
+URL=$(minikube service pharmago-ui -n pharmago --url)   # en Windows: dejar la terminal abierta y copiar la URL
+cd ../chaos-engineering
+./zero-downtime-test.sh "$URL" 180 --rollout    # reinicia las 4 apps mientras mide; esperado: 100%
+```
+
+Prueba de falla abrupta: con el script corriendo, borra **un** pod a la vez en otra terminal:
+
+```bash
+kubectl delete pod -n pharmago $(kubectl get pod -n pharmago -l app=pharmago-api-gateway -o name | head -1 | cut -d/ -f2) --wait=false
+```
+
+Para revisar los PDBs: `kubectl get pdb -n pharmago` (cada uno debe mostrar `ALLOWED DISRUPTIONS = 1`).
+
+### Limitaciones conocidas
+
+- **Base de datos (`pharmago-db`)**: es un único SQL Server Express sobre un PV `ReadWriteOnce`, así que es un punto único de falla y queda fuera del alcance. Express no soporta Always On ni réplicas. Los servicios toleran reinicios cortos gracias al retry con backoff y al circuit breaker de Polly, pero un reemplazo de la BD sí implica indisponibilidad.
+- **Observabilidad** (Prometheus, Grafana, Elasticsearch, Kibana, OTel Collector): fuera del alcance. Su caída no afecta a los usuarios.
+- **Rate limiting**: los contadores están en memoria de cada réplica del gateway. Con 2 réplicas, el límite efectivo por IP es aproximadamente el doble del configurado.
+- **Migraciones EF**: `MigrateDatabase()` corre al arrancar. En un despliegue desde cero, las 2 réplicas pueden intentar migrar a la vez. Si una falla, se reinicia y encuentra la migración ya aplicada.
+
 ## Troubleshooting
 
 ### Pods no se inician (Pending / telemetría)
