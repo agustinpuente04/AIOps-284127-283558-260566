@@ -3,7 +3,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
 using AspNetCoreRateLimit;
-using PharmaGo.ApiGateway.Middleware;
+using PharmaGo.ApiGateway.RateLimiting;
 using Instrumentation;
 using InstrumentationInterface;
 using Yarp.ReverseProxy.Transforms;
@@ -17,11 +17,16 @@ builder.Services.AddHealthChecks();
 // en curso. preStop (10s) + 25s < terminationGracePeriodSeconds (40s) del Deployment.
 builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(25));
 
-var rateLimitMode = builder.Configuration["RateLimiting:Mode"] ?? "IP";
+var rateLimitMode = builder.Configuration["RateLimiting:Mode"] ?? "TokenBucket";
 
-if (rateLimitMode.Equals("IP", StringComparison.OrdinalIgnoreCase))
+if (rateLimitMode.Equals("TokenBucket", StringComparison.OrdinalIgnoreCase))
 {
-    // Rate limiting por IP (útil para endpoints públicos)
+    // Token bucket con cubos por identidad (usuario autenticado / IP) + protección de login. Ver RateLimiting/.
+    builder.Services.AddTokenBucketRateLimiting(builder.Configuration);
+}
+else if (rateLimitMode.Equals("IP", StringComparison.OrdinalIgnoreCase))
+{
+    // Modo anterior (ventana fija por IP con AspNetCoreRateLimit). Se conserva solo como vía de retroceso.
     builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
     builder.Services.Configure<IpRateLimitPolicies>(builder.Configuration.GetSection("IpRateLimitPolicies"));
     builder.Services.AddInMemoryRateLimiting();
@@ -95,6 +100,11 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+var tokenBucketMode = rateLimitMode.Equals("TokenBucket", StringComparison.OrdinalIgnoreCase);
+
+// Primero: reemplaza la IP del socket por la real SOLO si el peer es un pod de nginx.
+if (tokenBucketMode) app.UseClientIp();
+
 app.UseCors("MyAllowedOrigins");
 app.UseGatewayCorrelationId();
 
@@ -106,13 +116,13 @@ if (app.Environment.IsDevelopment())
 
 app.UseMetricsMiddleware();
 
-if (rateLimitMode.Equals("IP", StringComparison.OrdinalIgnoreCase))
+if (tokenBucketMode)
+{
+    app.UseTokenBucketRateLimiting();
+}
+else if (rateLimitMode.Equals("IP", StringComparison.OrdinalIgnoreCase))
 {
     app.UseIpRateLimiting();
-}
-else if (rateLimitMode.Equals("User", StringComparison.OrdinalIgnoreCase))
-{
-    app.UseUserRateLimit();
 }
 
 app.UseAuthorization();

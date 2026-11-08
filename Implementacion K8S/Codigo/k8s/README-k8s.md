@@ -258,6 +258,15 @@ kubectl rollout restart deployment/pharmago-api-gateway -n pharmago
 kubectl rollout status  deployment/pharmago-api-gateway -n pharmago
 ```
 
+> ⚠️ **`minikube image load` no reemplaza una imagen que ya existe con la misma etiqueta** (`:latest`): el comando termina sin error pero los pods siguen corriendo la imagen anterior. Se detectó al desplegar el rate limiting: el endpoint nuevo devolvía 404 porque el pod ejecutaba el binario viejo. Para forzar el reemplazo y comprobar que el pod corre el código nuevo:
+>
+> ```bash
+> docker save pharmago-api-gateway:latest | minikube image load -
+> kubectl rollout restart deployment/pharmago-api-gateway -n pharmago
+> # debe devolver >= 1 si el pod trae la clase nueva (ajusta el nombre de la clase y del dll)
+> kubectl exec deploy/pharmago-api-gateway -n pharmago -- grep -c TokenBucketRateLimitMiddleware /app/PharmaGo.ApiGateway.dll
+> ```
+
 ### Verificación
 
 ```bash
@@ -266,7 +275,9 @@ cd ../chaos-engineering
 ./zero-downtime-test.sh "$URL" 180 --rollout    # reinicia las 4 apps mientras mide; esperado: 100%
 ```
 
-Prueba de falla abrupta: con el script corriendo, borra **un** pod a la vez en otra terminal:
+Para el resto de las pruebas de resiliencia (inyección de requests, sobrecarga de CPU/memoria/storage, cortes de red y desconexión de componentes, incluida la eliminación automática de pods del escenario D1) ver la [suite de Chaos Engineering](../chaos-engineering/README.md): `./chaos.sh list`.
+
+Prueba de falla abrupta manual: con el script corriendo, borra **un** pod a la vez en otra terminal:
 
 ```bash
 kubectl delete pod -n pharmago $(kubectl get pod -n pharmago -l app=pharmago-api-gateway -o name | head -1 | cut -d/ -f2) --wait=false
@@ -276,9 +287,9 @@ Para revisar los PDBs: `kubectl get pdb -n pharmago` (cada uno debe mostrar `ALL
 
 ### Limitaciones conocidas
 
-- **Base de datos (`pharmago-db`)**: es un único SQL Server Express sobre un PV `ReadWriteOnce`, así que es un punto único de falla y queda fuera del alcance. Express no soporta Always On ni réplicas. Los servicios toleran reinicios cortos gracias al retry con backoff y al circuit breaker de Polly, pero un reemplazo de la BD sí implica indisponibilidad.
+- **Base de datos (`pharmago-db`)**: es un único SQL Server Express sobre un PV `ReadWriteOnce`, así que es un punto único de falla y queda fuera del alcance. Express no soporta Always On ni réplicas. Los servicios **no** tienen reintentos hacia la BD (`UseSqlServer` sin `EnableRetryOnFailure`; el retry y el circuit breaker de Polly solo envuelven a los `HttpClient` entre servicios, que hoy no se invocan en ningún flujo) y su `/health` no verifica la BD. Un reemplazo o una caída de la BD implica 5xx en `/api/drug`, `/api/pharmacy` y demás rutas con BD hasta que vuelve (verificable con el escenario D3 de la [suite de caos](../chaos-engineering/README.md)).
 - **Observabilidad** (Prometheus, Grafana, Elasticsearch, Kibana, OTel Collector): fuera del alcance. Su caída no afecta a los usuarios.
-- **Rate limiting**: los contadores están en memoria de cada réplica del gateway. Con 2 réplicas, el límite efectivo por IP es aproximadamente el doble del configurado.
+- **Rate limiting**: el gateway usa token buckets separados por identidad (usuario autenticado / IP) y protege el login con backoff por cuenta; el estado vive en memoria de cada réplica, así que con 2 réplicas los umbrales efectivos pueden llegar al doble y un reinicio los borra. La IP real del cliente se lee solo si quien se conecta es un pod de nginx (Service headless `pharmago-ui-pods`). Diseño, parámetros y el porqué de cada decisión en [`Backend/RATE_LIMITING_GUIDE.md`](../Backend/RATE_LIMITING_GUIDE.md).
 - **Migraciones EF**: `MigrateDatabase()` corre al arrancar. En un despliegue desde cero, las 2 réplicas pueden intentar migrar a la vez. Si una falla, se reinicia y encuentra la migración ya aplicada.
 
 ## Troubleshooting
