@@ -1,5 +1,6 @@
 using InstrumentationInterface;
 using Microsoft.AspNetCore.Mvc;
+using PharmaGo.Exceptions;
 using PharmaGo.UsersService.IBusinessLogic;
 using PharmaGo.UsersService.Models.In;
 using PharmaGo.UsersService.Models.Out;
@@ -44,6 +45,13 @@ namespace PharmaGo.UsersService.Controllers
                 _customMetrics.RecordLogin("success");
 
                 return Ok(new LoginModelResponse() { token = authorization.Token, role = authorization.Role, userName = authorization.UserName });
+            }
+            catch (DatabaseUnavailableException)
+            {
+                // No es una credencial incorrecta: no debe contar como login fallido (inflaría la alerta de fuerza bruta durante una
+                // caída de la BD). El ExceptionFilter responde 503.
+                _customMetrics.RecordLogin("unavailable");
+                throw;
             }
             catch (Exception ex)
             {

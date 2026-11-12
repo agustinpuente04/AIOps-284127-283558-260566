@@ -284,6 +284,12 @@ assert_latency_flat() { # assert_latency_flat <regex_path> <factor> [p50|p95]  (
     _result FAIL "Latencia $m [$1] sin cambios relevantes (<= x$2 + 250ms)" "${b[$idx]}ms -> ${d[$idx]}ms"
   fi
 }
+assert_p50_below() { # assert_p50_below <fase> <regex_path> <ms>   (los fallos deben ser rápidos, no esperar un timeout)
+  local s; s=($(probe_stats "$1" "$2"))
+  if [ "${s[0]}" = 0 ]; then _result FAIL "p50 en '$1' [$2] < ${3}ms" "sin muestras"; return; fi
+  if [ "${s[4]}" -lt "$3" ]; then _result PASS "p50 en '$1' [$2] < ${3}ms (falla rápido)" "p50=${s[4]}ms, p95=${s[5]}ms"
+  else _result FAIL "p50 en '$1' [$2] < ${3}ms (falla rápido)" "p50=${s[4]}ms, p95=${s[5]}ms"; fi
+}
 assert_eq() { [ "$2" = "$3" ] && _result PASS "$1" "= $3" || _result FAIL "$1" "obtenido '$2', esperado '$3'"; }
 assert_true() { # assert_true <desc> <rc 0/1> [detalle]
   [ "$2" = 0 ] && _result PASS "$1" "$3" || _result FAIL "$1" "$3"

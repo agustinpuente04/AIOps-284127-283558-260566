@@ -8,7 +8,7 @@ MODE="$(arg_val --mode drop)"
 case "$MODE" in drop|reject) ;; *) die "--mode debe ser drop o reject";; esac
 
 hypothesis "Sin red hacia la BD, los endpoints que la usan fallan (5xx/timeout) pero la UI sigue disponible, los pods no se reinician y las apps se recuperan solas al restaurar la red."
-forbid_alert "Circuit breaker abierto" "los HttpClient con Polly no se usan en estos flujos"
+expect_alert "Circuit breaker abierto"
 
 steady_state
 restarts_snapshot
@@ -39,6 +39,7 @@ probe_stop
 
 MTTR="$(mttr_since "$MARK" "$DB_PATHS")"
 assert_5xx durante "$DB_PATHS"
+assert_p50_below durante "$DB_PATHS" 2000
 assert_no_5xx durante '^/$'
 assert_true "Recuperación automática sin reiniciar servicios (MTTR <= 120s)" "$([ "$MTTR" != n/a ] && awk -v m="$MTTR" 'BEGIN{exit !(m<=120)}' && echo 0 || echo 1)" "MTTR=${MTTR}s"
 restarts_delta >/dev/null

@@ -23,9 +23,10 @@ HEAVY_SECS="$(arg_val --heavy-secs 120)"; HEAVY="$(arg_val --heavy 8)"; CLIENTS=
 OWNER="${LOGIN_USER:-admin}"; OWNER_PASS="${LOGIN_PASS:-Abcdef12.}"
 node_ssh_ok || die "C4 necesita 'minikube ssh' (la carga se genera dentro del nodo)."
 
-hypothesis "Un bloqueo largo sobre la tabla Drugs deja sin servicio solo a las rutas que la usan (/api/drug): /api/pharmacy y la UI siguen respondiendo, ningún pod se reinicia y todo se recupera solo al liberar el bloqueo."
+hypothesis "Un bloqueo largo sobre la tabla Drugs deja sin servicio solo a /api/drug, y falla RÁPIDO (timeout de comando de 5 s + circuit breaker de la entidad): /api/pharmacy y la UI siguen respondiendo, ningún pod se reinicia y todo se recupera solo al liberar el bloqueo."
 hypothesis "Con el motor de SQL Server saturado de consultas pesadas la latencia de las rutas con BD sube, pero no hay errores 5xx en la UI ni caída total, y la recuperación es inmediata al terminar."
 expect_alert "Tasa de errores 5xx anómala"
+expect_alert "Circuit breaker abierto"
 
 HEAVY_Q="SELECT SUM(CONVERT(bigint, CHECKSUM(HASHBYTES('SHA2_512', CONVERT(varchar(20), CONVERT(bigint, a.object_id) + b.object_id))))) FROM sys.all_objects a CROSS JOIN sys.all_objects b CROSS JOIN sys.all_objects c OPTION (MAXDOP 1)"
 
@@ -47,6 +48,8 @@ db_release() {
   sql "DECLARE @k nvarchar(max)=''; SELECT @k+='KILL '+CAST(session_id AS varchar(10))+';' FROM sys.dm_exec_sessions WHERE program_name='SQLCMD' AND session_id<>@@SPID AND is_user_process=1; EXEC(@k);" master >/dev/null 2>&1
   sql "IF COL_LENGTH('dbo.Drugs','chaos_lock') IS NOT NULL ALTER TABLE dbo.Drugs DROP COLUMN chaos_lock" "$DB_NAME" >/dev/null 2>&1
 }
+# Bloqueo de esquema (Sch-M) concedido sobre alguna tabla de PharmaDb: prueba directa de que el DDL abierto está reteniendo el bloqueo
+db_lock_held() { sql "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.dm_tran_locks WHERE request_mode='Sch-M' AND request_status='GRANT' AND resource_type='OBJECT' AND resource_database_id=DB_ID('$DB_NAME')" master | num; }
 db_blocked()  { sql "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.dm_exec_requests WHERE blocking_session_id <> 0" master | num; }
 db_appconns() { sql "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.dm_exec_sessions WHERE program_name LIKE '%SqlClient%'" master | num; }
 db_running()  { sql "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.dm_exec_requests r JOIN sys.dm_exec_sessions s ON s.session_id=r.session_id WHERE s.program_name='SQLCMD' AND r.session_id<>@@SPID" master | num; }
@@ -73,8 +76,8 @@ LOCK_LOAD="$WORK/lock-load.txt"; : > "$LOCK_LOAD"
 load_node /api/drug "$CLIENTS" "$LOCK_SECS" "$LOCK_LOAD" 0 ui "$TOKEN" &
 LOAD_PID=$!
 hold $(( LOCK_SECS / 2 ))
-BLOCKED_PEAK="$(db_blocked)"; APP_CONNS="$(db_appconns)"
-log "A mitad del bloqueo: ${BLOCKED_PEAK:-?} requests bloqueadas en SQL, ${APP_CONNS:-?} conexiones de la app a la BD"
+LOCK_HELD="$(db_lock_held)"; BLOCKED_PEAK="$(db_blocked)"; APP_CONNS="$(db_appconns)"
+log "A mitad del bloqueo: Sch-M retenido=${LOCK_HELD:-?}, ${BLOCKED_PEAK:-?} requests bloqueadas en SQL, ${APP_CONNS:-?} conexiones de la app a la BD"
 hold $(( LOCK_SECS - LOCK_SECS / 2 ))
 wait "$LOAD_PID" 2>/dev/null
 INFLIGHT_PEAK="$(prom_scalar "max_over_time(max(pharmago_http_requests_in_flight{job=\"otlp-collector\"})[$(( LOCK_SECS + 20 ))s:5s])")"
@@ -108,10 +111,13 @@ PARAMS+=("MTTR de /api/drug tras liberar el bloqueo: ${MTTR}s")
 LEFT_COL="$(sql "SET NOCOUNT ON; SELECT ISNULL(COL_LENGTH('dbo.Drugs','chaos_lock'), 0)" "$DB_NAME" | num)"
 
 # Etapa 1
-assert_true "El bloqueo se aplicó: hubo requests bloqueadas dentro de SQL Server" "$([ "${BLOCKED_PEAK:-0}" -ge 1 ] && echo 0 || echo 1)" "${BLOCKED_PEAK:-0} bloqueadas"
+# Con el circuit breaker, las requests ya no se acumulan dentro de SQL Server (BLOCKED_PEAK baja de ~150 a ~0): eso es la mejora, no un fallo.
+# Lo que debe verificarse es que el bloqueo ESTABA puesto.
+assert_true "El bloqueo de esquema (Sch-M) estaba retenido en SQL Server a mitad de la etapa" "$([ "${LOCK_HELD:-0}" -ge 1 ] && echo 0 || echo 1)" "${LOCK_HELD:-0} bloqueo(s) Sch-M; ${BLOCKED_PEAK:-0} requests esperando dentro de SQL"
 assert_5xx bloqueo '^/api/drug$'
 assert_no_5xx bloqueo '^/$'
 assert_no_5xx bloqueo '^/api/pharmacy$'
+assert_p50_below bloqueo '^/api/drug$' 1500
 assert_true "Recuperación automática al liberar el bloqueo (MTTR <= 90 s)" "$([ "$MTTR" != n/a ] && awk -v m="$MTTR" 'BEGIN{exit !(m<=90)}' && echo 0 || echo 1)" "MTTR=${MTTR}s"
 # Etapa 2
 assert_true "Las consultas pesadas saturaron la CPU de la BD (>= 80% de su límite)" "$([ "${CPU_PCT:-0}" -ge 80 ] && echo 0 || echo 1)" "${CPU_PCT:-0}%"
@@ -125,5 +131,5 @@ restarts_delta >/dev/null; D="$RESTART_DELTA_DETAIL"
 [ "$RESTART_DELTA_TOTAL" -gt 0 ] && note "La saturación de la BD provocó reinicios de pods (probablemente liveness probes por falta de hilos): $(echo "$D" | tr '\n' ';')"
 assert_eq "Pods reiniciados durante la saturación de la BD" "$RESTART_DELTA_TOTAL" 0
 assert_true "Todos los deployments Ready al terminar" "$(wait_ready 180 && echo 0 || echo 1)"
-note "Las requests a una tabla bloqueada no fallan rápido: esperan hasta el timeout de comando de SqlClient (30 s por defecto) ocupando un hilo y una conexión del pool (100 por réplica, sin Max Pool Size en el connection string). Un bloqueo largo sobre una tabla caliente se convierte en agotamiento de recursos. Como /health no consulta la BD, los pods siguen Ready y Kubernetes les sigue enviando tráfico."
+note "Sin resiliencia, una request a una tabla bloqueada espera el timeout de comando de SqlClient (30 s) ocupando un hilo y una conexión del pool (100 por réplica): con decenas de requests bloqueadas el servicio se queda sin hilos, falla /health y Kubernetes lo reinicia. Con CommandTimeout de 5 s y un circuit breaker por entidad (Backend/RESILIENCIA_BD.md) el fallo queda acotado a la tabla afectada y las requests siguientes fallan en milisegundos con 503."
 finish

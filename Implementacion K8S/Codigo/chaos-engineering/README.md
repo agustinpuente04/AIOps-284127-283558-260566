@@ -59,7 +59,7 @@ Las alertas de Grafana usan `rate(...[5m])` o z-scores sobre la última hora, co
 | Tráfico anómalo (z-score) | R1 | Disparó a los 238 s (z=5.6). Una segunda ráfaga idéntica dentro de la misma hora **no** dispara (z=2.4): la primera infla la línea base. R1 lo detecta y marca `SKIP` |
 | Servicio sin réplicas disponibles | D2 | Disparó a los 148 s |
 | CPU de pod cerca del límite | C1 | Con 360 s **no** dispara: el `rate[5m]` supera el 80% solo ~3 min y la regla pide 3 min continuos. Con 600 s (por defecto de C1-C3) **disparó a los 442 s** |
-| Circuit breaker abierto | D2, N3 | **No** dispara, como se predijo (hueco: ningún flujo usa los HttpClient con Polly) |
+| Circuit breaker abierto | C4, D3, N3 | Disparó a los **47 s** (C4), **83 s** (D3) y **96 s** (N3) desde que la BD fue afectada. Antes de la resiliencia de la BD **nunca** podía dispararse. En D2 (pharmacy a 0) sigue sin dispararse: los `HttpClient` entre servicios no se usan |
 | Tasa de errores 5xx anómala | C4 | Disparó a los 227-278 s (bloqueo largo sobre `Drugs`) |
 | Latencia anómala | N1 | **No** dispara aunque los clientes ven 586 ms en vez de 5 ms: mide el tiempo dentro del servidor, no la latencia de red |
 
@@ -74,7 +74,7 @@ Las alertas de Grafana usan `rate(...[5m])` o z-scores sobre la última hora, co
 | **C1** | 2 bucles de CPU en **una** réplica del gateway (límite 500m) | La otra réplica sostiene el servicio (>= 99%) | CPU de pod cerca del límite |
 | **C2** | CPU en **todas** las réplicas de pharmacy | Sube la latencia de las rutas de pharmacy; `/api/users` no se ve afectado | CPU de pod cerca del límite |
 | **C3** | CPU en `pharmago-db` | Sube la latencia de las rutas con BD; la UI sigue disponible | CPU de pod cerca del límite |
-| **C4** | Satura la BD **desde dentro de SQL Server**: (1) un `ALTER TABLE` abierto sobre `Drugs` mantiene un bloqueo de esquema (Sch-M) mientras 60 clientes autenticados piden `/api/drug`; (2) 8 consultas CPU-bound concurrentes (hash SHA-512 por fila). Fases `bloqueo`, `recuperacion`, `pesadas` | El bloqueo debería dejar sin servicio solo a `/api/drug`, sin reiniciar pods; con el motor saturado sube la latencia sin 5xx en la UI. **Hoy falla**: el bloqueo se propaga a `/api/pharmacy` y reinicia pods (hallazgo 15) | Tasa de errores 5xx anómala |
+| **C4** | Satura la BD **desde dentro de SQL Server**: (1) un `ALTER TABLE` abierto sobre `Drugs` mantiene un bloqueo de esquema (Sch-M) mientras 60 clientes autenticados piden `/api/drug`; (2) 8 consultas CPU-bound concurrentes (hash SHA-512 por fila). Fases `bloqueo`, `recuperacion`, `pesadas` | El bloqueo deja sin servicio solo a `/api/drug` y **falla rápido** (503 en milisegundos); `/api/pharmacy` y la UI siguen respondiendo, **0 reinicios**, recuperación sola. Con el motor saturado sube la latencia sin 5xx en la UI | Circuit breaker abierto (y Tasa de errores 5xx) |
 | **M1** | Lleva un pod de users al ~88% de `limits.memory` (retiene RAM real con `tail`) | Sin OOMKill, sin reinicios, >= 99% | Memoria de pod cerca del límite |
 | **M2** | Una réplica de users intenta retener más memoria que su `limits.memory` (125%) | El kernel hace cumplir el límite (`oom_kill` del cgroup +1) sin afectar al servicio (>= 99%). El OOMKill **del contenedor** no se puede forzar desde dentro del pod (ver nota) | - |
 | **S1** | Escribe en el disco efímero del nodo hasta dejar ~14% libre, con tope de seguridad | La app no se degrada y no se desaloja ningún pod | Disco del nodo casi lleno |
@@ -82,10 +82,10 @@ Las alertas de Grafana usan `rate(...[5m])` o z-scores sobre la última hora, co
 | **S3** | Inunda de logs un pod de users (200 líneas/s) hacia Fluent-bit -> Elasticsearch | Sin impacto a usuarios; llega al menos el 50% de las líneas | - |
 | **N1** | `tc netem` con 500 ms de latencia y 20% de pérdida en las réplicas de users | Sube la latencia de `/api/users` para los clientes, pharmacy no cambia, sin caída total | Latencia anómala **no** salta (punto ciego) |
 | **N2** | `iptables` corta gateway -> pharmacy (`--mode drop` o `reject`) | Fallan solo las rutas de pharmacy; MTTR tras restaurar <= 120 s | Saturación de requests (modo drop) |
-| **N3** | `iptables` corta users/pharmacy -> BD (TCP 1433) | Fallan las rutas con BD, la UI no, las apps se recuperan solas | Circuit breaker **no** salta (ver hallazgos) |
+| **N3** | `iptables` corta users/pharmacy -> BD (TCP 1433) | Las rutas con BD fallan **rápido** (p50 6 ms) gracias al breaker, la UI no, 0 reinicios y recuperación sola (MTTR 15 s) | Circuit breaker abierto |
 | **D1** | Elimina un pod aleatorio de las 4 apps cada 30 s (`--abrupt`: sin gracia) | 100% de disponibilidad (95% en modo abrupto) | - |
 | **D2** | Escala pharmacy a 0 durante 240 s | Fallan solo sus rutas; MTTR <= 90 s | Servicio sin réplicas disponibles |
-| **D3** | Baja la BD a 0 y la vuelve a levantar | 5xx en rutas con BD; recuperación sin reiniciar apps; los datos persisten | - |
+| **D3** | Baja la BD a 0 y la vuelve a levantar | 503 rápido en las rutas con BD (p50 5 ms) mientras está caída; recuperación sin reiniciar apps (MTTR 44 s); los datos persisten | Circuit breaker abierto |
 | **D4** | Baja el OTel Collector | Los usuarios no notan nada; Prometheus pierde las métricas de aplicación | - |
 | **G1** | Tráfico + CPU en un gateway + latencia/pérdida en users, a la vez | Degrada pero sigue sirviendo (>= 95%) | CPU de pod, Latencia anómala |
 
@@ -107,8 +107,8 @@ Duraciones por defecto: `./chaos.sh list`. Las pruebas de red agregan unos minut
 
 Salieron de leer el código al diseñar los experimentos y los escenarios los verifican:
 
-1. **El circuit breaker de Polly nunca se ejecuta.** `PharmacyServiceClient` y `UsersServiceClient` están registrados en `ServiceFactory.cs` pero ningún controller ni manager los invoca. La alerta *Circuit breaker abierto* no salta ni cuando pharmacy está caído (D2) ni con la BD inalcanzable (N3). D2 y N3 lo verifican con `forbid_alert`.
-2. **La BD no tiene reintentos.** `UseSqlServer` no usa `EnableRetryOnFailure` en ningún servicio, así que una caída de la BD (D3, N3) se traduce directamente en 5xx hasta que vuelve. `README-k8s.md` decía lo contrario y se corrigió.
+1. **[Corregido para la BD] El circuit breaker de Polly nunca se ejecutaba.** Los `HttpClient` entre servicios (users <-> pharmacy) siguen sin usarse, porque los servicios comparten la BD y leen las tablas del otro; pero el acceso a la BD ahora tiene un breaker **por entidad** (`db:Drug`, `db:Pharmacy`...) y la alerta *Circuit breaker abierto* se dispara en C4, D3 y N3. Ver [`RESILIENCIA_BD.md`](../Backend/RESILIENCIA_BD.md).
+2. **[Corregido] La BD no tenía reintentos ni un timeout razonable.** Ahora hay timeout de comando de 5 s, breaker por entidad y retry con *equal jitter* solo para lecturas con fallos transitorios de conexión. D3 y N3 ya no devuelven 500 crudos, y las requests fallan en milisegundos mientras el breaker está abierto. Detalle y límites en la guía.
 3. **`/health` no verifica la BD** (`AddHealthChecks()` sin checks). Con la BD caída o inalcanzable los pods siguen `Ready` y Kubernetes les sigue enviando tráfico que falla (D3, N3). Un check con `AddDbContextCheck` los sacaría del balanceo.
 4. **[Corregido] El rate limit se eludía falsificando cabeceras.** Llegando directo al gateway con `X-Real-IP` rotativo pasaban 400 de 400 requests sin un 429. Ahora el gateway ignora `X-Real-IP` y lee `X-Forwarded-For` solo si el peer es un pod de nginx: con cabeceras rotativas pasan 527 de 28 200 (R1 `--direct`). Un primer intento, confiar en toda la red de pods (CIDR), **seguía fallando** (400 de 400) porque el puente del nodo cae dentro de ese rango; solo se descubrió probando contra el cluster. Ver [`RATE_LIMITING_GUIDE.md`](../Backend/RATE_LIMITING_GUIDE.md), D5.
 5. **Las alertas de `pharmago_*` quedan ciegas si cae el OTel Collector** (D4): usan `noDataState: OK` y no hay una alerta sobre `up{job="otlp-collector"}`.
@@ -121,7 +121,16 @@ Salieron de leer el código al diseñar los experimentos y los escenarios los ve
 12. **El túnel de `minikube service` (driver Docker en Windows) se satura con ~100 conexiones** y genera timeouts que no son de la aplicación: desde dentro del nodo, 6000 requests con 200 clientes dieron 6000 respuestas correctas en `/` y cero errores en `/api/drug`. Por eso R1 genera la carga dentro del nodo.
 13. **`minikube image load` no reemplaza una imagen con la misma etiqueta** (`:latest`). Al desplegar el rate limiting los pods siguieron con el binario viejo sin ningún aviso (el endpoint nuevo respondía 404). Hay que cargar con `docker save <imagen> | minikube image load -` y comprobar el contenido del pod. Documentado en `k8s/README-k8s.md`.
 14. **Seguridad del login, sin relación con el rate limit:** las contraseñas se comparan en texto plano, el login distingue "usuario no existe" (404) de "clave incorrecta" (400), lo que permite enumerar cuentas, y las sesiones no caducan ni hay logout (el login reutiliza siempre el mismo token). El backoff por cuenta frena la fuerza bruta, pero no corrige nada de esto.
-15. **Un bloqueo largo sobre una tabla tumba el servicio entero y reinicia los pods (C4).** Un `ALTER TABLE` abierto sobre `Drugs` dejó 128-175 requests bloqueadas dentro de SQL Server y 146-184 conexiones de la app a la BD (el pool es de 100 por réplica). `/api/pharmacy`, que **no** usa esa tabla, falló en 20 de 24 requests, y **los dos pods de `pharmacy-service` fallaron la liveness probe** (`/health` agotó el timeout) y se reiniciaron a la vez, 2 veces cada uno. Causa: las consultas son síncronas y esperan hasta el timeout de comando de SqlClient (30 s) ocupando un hilo y una conexión; con decenas de requests bloqueadas el proceso se queda sin hilos y ni siquiera atiende `/health`. Reiniciar no arregla el bloqueo, solo suma una caída. La alerta de 5xx sí saltó (227-278 s) y la recuperación fue de 1-14 s tras liberar el bloqueo. Mitigaciones posibles (no implementadas): `Command Timeout` corto (p. ej. 5 s) y `SET LOCK_TIMEOUT`, `Max Pool Size`, acceso a datos `async`, timeouts por request en YARP, y una liveness probe más tolerante o independiente de la carga.
+15. **[Corregido] Un bloqueo largo sobre una tabla tumbaba el servicio entero y reiniciaba los pods (C4).** Medido antes y después de la resiliencia de la BD con el mismo escenario (60 clientes, bloqueo Sch-M de 150 s sobre `Drugs`):
+    | | Antes | Después |
+    |---|---|---|
+    | `/api/pharmacy` (no usa `Drugs`) | falló 20 de 24 (17% de disponibilidad) | **67 de 67 OK** |
+    | `/api/drug` (tabla bloqueada) | esperaba 30 s: p95 5012 ms | falla rápido con 503: **p50 45 ms, p95 112 ms** |
+    | Requests esperando dentro de SQL | 128-175 | **0** (el breaker corta antes) |
+    | Conexiones de la app a la BD | 146-184 (pool de 100 por réplica) | **31** |
+    | Reinicios por liveness | **2 por pod**, ambos a la vez | **0** |
+    | Recuperación al liberar | 1-14 s | 13.6 s |
+    | Alerta *Circuit breaker abierto* | imposible | 47 s |
 16. **La BD usa `READ_COMMITTED_SNAPSHOT = 1`:** los lectores no se bloquean con bloqueos exclusivos de fila o tabla, solo con bloqueos de esquema (DDL). Es lo que hace que una migración o un `ALTER TABLE` largo sobre una tabla caliente sea el caso peligroso, y lo que usa C4 (la app aplica migraciones EF al arrancar con `MigrateDatabase()`).
 
 ## Archivos

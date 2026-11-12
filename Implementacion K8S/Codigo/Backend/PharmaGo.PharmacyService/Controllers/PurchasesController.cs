@@ -1,5 +1,6 @@
 using InstrumentationInterface;
 using Microsoft.AspNetCore.Mvc;
+using PharmaGo.Exceptions;
 using PharmaGo.PharmacyService.IBusinessLogic;
 using PharmaGo.PharmacyService.Converters;
 using PharmaGo.PharmacyService.Enums;
@@ -88,6 +89,11 @@ namespace PharmaGo.PharmacyService.Controllers
                 _customMetrics.RecordPurchase("success", purchase.TotalAmount);
                 var purchaseModelResponse = new PurchaseModelResponse(purchase);
                 return Ok(purchaseModelResponse);
+            }
+            catch (DatabaseUnavailableException)
+            {
+                _customMetrics.RecordPurchase("unavailable", 0);
+                throw;
             }
             catch (Exception ex)
             {
