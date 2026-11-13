@@ -23,14 +23,33 @@ else
   APPLY='$IPT -A OUTPUT -d '"$IP"' -p tcp -m comment --comment chaos-pharmago -j REJECT --reject-with tcp-reset'
 fi
 PARAMS+=("pods afectados (egress): $(echo $PODS)" "destino bloqueado: pharmacy-service ($IP), modo $MODE")
+# La alerta de saturación (requests en vuelo > 20 por réplica durante 2 min) necesita tráfico real: el probe solo
+# manda ~1 request/s y corta a los 5 s, así que deja como mucho 1 request en vuelo. En modo drop se agregan clientes
+# autenticados (cubo propio, no se limitan con el probe) cuyas requests quedan colgadas hasta su timeout de 10 s.
+CLIENTS="$(arg_val --clients 60)"
+if [ "$MODE" = drop ]; then
+  TOKEN="$(owner_token)"; [ -n "$TOKEN" ] || die "No se pudo iniciar sesión con el usuario de pruebas (define LOGIN_USER / LOGIN_PASS)."
+  PARAMS+=("tráfico durante el corte: $CLIENTS clientes autenticados sobre /api/drug, generados desde el nodo")
+fi
 
 probe_start
 phase antes; hold "$PRE_SECS"
 
 for p in $PODS; do net_inject "$p" "$APPLY" "$SECS"; done
 phase durante
+if [ "$MODE" = drop ]; then
+  LOAD="$WORK/load.txt"; : > "$LOAD"
+  load_node /api/drug "$CLIENTS" "$SECS" "$LOAD" 0 ui "$TOKEN" &
+  LOAD_PID=$!
+fi
 hold "$SECS"
 READY_DURING="$(deploys_not_ready)"
+if [ "$MODE" = drop ]; then
+  INFLIGHT="$(prom_scalar 'max(max_over_time(pharmago_http_requests_in_flight{job="otlp-collector",exported_job="PharmaGo.ApiGateway"}['"$SECS"'s]))')"
+  wait "$LOAD_PID" 2>/dev/null
+  read -r n ok q l f t p95 <<<"$(load_summary "$LOAD")"
+  PARAMS+=("tráfico inyectado: $n requests, 2xx=$ok, 429=$l, 5xx=$f, timeouts=$t" "pico de requests en vuelo en una réplica del gateway: ${INFLIGHT:-?}")
+fi
 
 log "Rollback: quitando la regla de iptables"
 for p in $PODS; do net_revert "$p"; done

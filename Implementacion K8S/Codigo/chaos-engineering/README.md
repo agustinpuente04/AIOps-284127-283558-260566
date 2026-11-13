@@ -44,7 +44,10 @@ Códigos de salida: `0` hipótesis cumplida, `1` alguna aserción falló, `2` el
 2. **Probe de disponibilidad** en segundo plano, sobre la UI (`/`, `/api/drug`, `/api/pharmacy`, `/api/users`), igual que `zero-downtime-test.sh`. Cuenta como fallo un `000` (conexión/timeout) o un `5xx`. Un `4xx` o `429` significa que el componente respondió.
 3. **Fases:** `antes` (línea base) -> `durante` (fallo activo) -> `despues` (recuperación). Se calcula disponibilidad, p50 y p95 por fase y por ruta.
 4. **Rollback automático:** cada inyección registra su reversión con un `trap`, que se ejecuta aunque el script falle o se cancele. Las inyecciones además se autolimitan (`timeout` dentro del pod, escalado con anotación de respaldo, `sleep` + reversión dentro del contenedor efímero de red).
-5. **Aserciones y alertas:** se comprueban las hipótesis y, vía la API de Grafana, si las alertas esperadas se dispararon (con su tiempo de detección, MTTD).
+5. **Aserciones y alertas:** se comprueban las hipótesis y, vía la API de Grafana, si las alertas esperadas se dispararon (con su tiempo de detección, MTTD). Se distinguen tres cosas:
+   - **Propiedades de resiliencia** (disponibilidad, aislamiento entre rutas, reinicios, recuperación, alertas): se assertan con PASS/FAIL.
+   - **Validez del experimento** (que el estímulo realmente llegó, p. ej. que la CPU del pod llegó a >= 90% de su límite): se asserta. Si falla, las demás conclusiones del escenario no valen.
+   - **Magnitud de la degradación** (cuánto subió la latencia): se registra como **observación** en "Hallazgos", sin PASS/FAIL. Un sistema que se degrada menos de lo que se supuso no está fallando; exigir un factor fijo convertía en FAIL justo los casos en que el sistema se comportó mejor (C2 dio x1.65 contra un x2 inventado al escribir el script).
 6. **Informe:** `reports/<ID>-<fecha>.md` con hipótesis, parámetros, resultado de cada aserción, tabla de disponibilidad/latencia por fase y hallazgos.
 
 ### Alertas y duraciones
@@ -58,7 +61,8 @@ Las alertas de Grafana usan `rate(...[5m])` o z-scores sobre la última hora, co
 | Logins fallidos anómalos | R2 | Disparó a los 161 s (1465 logins, 336 llegaron a users-service) |
 | Tráfico anómalo (z-score) | R1 | Disparó a los 238 s (z=5.6). Una segunda ráfaga idéntica dentro de la misma hora **no** dispara (z=2.4): la primera infla la línea base. R1 lo detecta y marca `SKIP` |
 | Servicio sin réplicas disponibles | D2 | Disparó a los 148 s |
-| CPU de pod cerca del límite | C1 | Con 360 s **no** dispara: el `rate[5m]` supera el 80% solo ~3 min y la regla pide 3 min continuos. Con 600 s (por defecto de C1-C3) **disparó a los 442 s** |
+| CPU de pod cerca del límite | C1, C2 | Con 360 s **no** dispara: el `rate[5m]` supera el 80% solo ~3 min y la regla pide 3 min continuos. Con 600 s (por defecto de C1-C3) **disparó a los 442 s**. En la BD (C3) **no puede** dispararse: ver hallazgo 18. G1 (300 s) no la espera porque dura menos de lo que la regla tarda |
+| Saturación de requests en curso | N2 | Disparó a los **211 s** con 60 clientes colgados contra pharmacy (pico de 45 requests en vuelo en una réplica del gateway). Con solo el probe (pico de 1) no hay saturación que detectar: la alerta necesita tráfico real |
 | Circuit breaker abierto | C4, D3, N3 | Disparó a los **47 s** (C4), **83 s** (D3) y **96 s** (N3) desde que la BD fue afectada. Antes de la resiliencia de la BD **nunca** podía dispararse. En D2 (pharmacy a 0) sigue sin dispararse: los `HttpClient` entre servicios no se usan |
 | Tasa de errores 5xx anómala | C4 | Disparó a los 227-278 s (bloqueo largo sobre `Drugs`) |
 | Latencia anómala | N1 | **No** dispara aunque los clientes ven 586 ms en vez de 5 ms: mide el tiempo dentro del servidor, no la latencia de red |
@@ -72,8 +76,8 @@ Las alertas de Grafana usan `rate(...[5m])` o z-scores sobre la última hora, co
 | **R3** | 21 payloads malformados o maliciosos: JSON inválido, body de 2 y 35 MB, anidado de 3000 niveles, SQLi/XSS, URL de 12 KB, path traversal, métodos no permitidos | Siempre 4xx; nunca 5xx ni conexión caída; ningún pod se reinicia | - |
 | **R4** | Inundación anónima sostenida (40 clientes, 90 s) desde una IP mientras, **desde esa misma IP**, un usuario autenticado y un anónimo hacen 1 request por segundo | El autenticado recibe siempre 200 (cubo propio), el anónimo 429 con `Retry-After`, y al cesar la inundación el anónimo se recupera en segundos | - |
 | **C1** | 2 bucles de CPU en **una** réplica del gateway (límite 500m) | La otra réplica sostiene el servicio (>= 99%) | CPU de pod cerca del límite |
-| **C2** | CPU en **todas** las réplicas de pharmacy | Sube la latencia de las rutas de pharmacy; `/api/users` no se ve afectado | CPU de pod cerca del límite |
-| **C3** | CPU en `pharmago-db` | Sube la latencia de las rutas con BD; la UI sigue disponible | CPU de pod cerca del límite |
+| **C2** | CPU en **todas** las réplicas de pharmacy | Las rutas de pharmacy se degradan sin caída total; `/api/users` no se ve afectado. Se verifica que la CPU llegó a >= 90% del límite y la subida de latencia queda como observación | CPU de pod cerca del límite |
+| **C3** | CPU en `pharmago-db` | Las rutas con BD se degradan; la UI sigue disponible. Se verifica que la CPU llegó a >= 90% del límite y la subida de latencia queda como observación | CPU de pod cerca del límite **no** salta (hueco, hallazgo 18) |
 | **C4** | Satura la BD **desde dentro de SQL Server**: (1) un `ALTER TABLE` abierto sobre `Drugs` mantiene un bloqueo de esquema (Sch-M) mientras 60 clientes autenticados piden `/api/drug`; (2) 8 consultas CPU-bound concurrentes (hash SHA-512 por fila). Fases `bloqueo`, `recuperacion`, `pesadas` | El bloqueo deja sin servicio solo a `/api/drug` y **falla rápido** (503 en milisegundos); `/api/pharmacy` y la UI siguen respondiendo, **0 reinicios**, recuperación sola. Con el motor saturado sube la latencia sin 5xx en la UI | Circuit breaker abierto (y Tasa de errores 5xx) |
 | **M1** | Lleva un pod de users al ~88% de `limits.memory` (retiene RAM real con `tail`) | Sin OOMKill, sin reinicios, >= 99% | Memoria de pod cerca del límite |
 | **M2** | Una réplica de users intenta retener más memoria que su `limits.memory` (125%) | El kernel hace cumplir el límite (`oom_kill` del cgroup +1) sin afectar al servicio (>= 99%). El OOMKill **del contenedor** no se puede forzar desde dentro del pod (ver nota) | - |
@@ -81,13 +85,13 @@ Las alertas de Grafana usan `rate(...[5m])` o z-scores sobre la última hora, co
 | **S2** | Agota el archivo de datos de SQL Server (`MAXSIZE` = tamaño actual) hasta el error 1105 | Las escrituras fallan, las lecturas siguen en 200, ningún pod se reinicia | - |
 | **S3** | Inunda de logs un pod de users (200 líneas/s) hacia Fluent-bit -> Elasticsearch | Sin impacto a usuarios; llega al menos el 50% de las líneas | - |
 | **N1** | `tc netem` con 500 ms de latencia y 20% de pérdida en las réplicas de users | Sube la latencia de `/api/users` para los clientes, pharmacy no cambia, sin caída total | Latencia anómala **no** salta (punto ciego) |
-| **N2** | `iptables` corta gateway -> pharmacy (`--mode drop` o `reject`) | Fallan solo las rutas de pharmacy; MTTR tras restaurar <= 120 s | Saturación de requests (modo drop) |
+| **N2** | `iptables` corta gateway -> pharmacy (`--mode drop` o `reject`). En modo drop, 60 clientes autenticados (`--clients`) piden `/api/drug` desde el nodo y quedan colgados | Fallan solo las rutas de pharmacy; MTTR tras restaurar <= 120 s | Saturación de requests (modo drop) |
 | **N3** | `iptables` corta users/pharmacy -> BD (TCP 1433) | Las rutas con BD fallan **rápido** (p50 6 ms) gracias al breaker, la UI no, 0 reinicios y recuperación sola (MTTR 15 s) | Circuit breaker abierto |
 | **D1** | Elimina un pod aleatorio de las 4 apps cada 30 s (`--abrupt`: sin gracia) | 100% de disponibilidad (95% en modo abrupto) | - |
 | **D2** | Escala pharmacy a 0 durante 240 s | Fallan solo sus rutas; MTTR <= 90 s | Servicio sin réplicas disponibles |
 | **D3** | Baja la BD a 0 y la vuelve a levantar | 503 rápido en las rutas con BD (p50 5 ms) mientras está caída; recuperación sin reiniciar apps (MTTR 44 s); los datos persisten | Circuit breaker abierto |
 | **D4** | Baja el OTel Collector | Los usuarios no notan nada; Prometheus pierde las métricas de aplicación | - |
-| **G1** | Tráfico + CPU en un gateway + latencia/pérdida en users, a la vez | Degrada pero sigue sirviendo (>= 95%) | CPU de pod, Latencia anómala |
+| **G1** | Tráfico autenticado desde el nodo + CPU en un gateway + latencia/pérdida en users, a la vez | Degrada pero sigue sirviendo (>= 95%) y `/api/users` refleja la latencia de red | - (la de CPU tarda más que los 300 s del escenario) |
 
 Duraciones por defecto: `./chaos.sh list`. Las pruebas de red agregan unos minutos la primera vez (descarga de la imagen). Los escenarios con alerta de CPU duran 10 min; `./chaos.sh all` completo tarda unas 3 horas.
 
@@ -132,6 +136,8 @@ Salieron de leer el código al diseñar los experimentos y los escenarios los ve
     | Recuperación al liberar | 1-14 s | 13.6 s |
     | Alerta *Circuit breaker abierto* | imposible | 47 s |
 16. **La BD usa `READ_COMMITTED_SNAPSHOT = 1`:** los lectores no se bloquean con bloqueos exclusivos de fila o tabla, solo con bloqueos de esquema (DDL). Es lo que hace que una migración o un `ALTER TABLE` largo sobre una tabla caliente sea el caso peligroso, y lo que usa C4 (la app aplica migraciones EF al arrancar con `MigrateDatabase()`).
+17. **Con users-service degradado, los usuarios autenticados pierden su cupo propio y compiten por el de su IP** (G1). El gateway valida cada token que no tiene en caché preguntándole a users-service (timeout 1.5 s, caché positiva de 5 min). Con 500 ms de latencia y 20% de pérdida en users, esas validaciones devolvieron 503 o tardaron más de 1 s, y el gateway trató las requests como **anónimas**, por diseño (`SessionValidator`: "timeout o users-service caído: tratar como anónimo"). Así se descontaron del cubo de la IP. Como en el test toda la carga y el probe entran por la IP del nodo, la carga agotó ese cubo y el probe recibió 429 en **todas** las rutas (45-48 de 106 por ruta), no solo en `/api/users`. Se normalizó al cachearse las primeras validaciones exitosas (~2 min). En producción, con IPs distintas, el impacto es menor; detrás de un NAT compartido (una oficina) los usuarios logueados se pisan entre ellos. Se deja así: es el comportamiento del sistema, y precalentar la caché en el test lo escondería. Usar una sesión ya validada aunque esté vencida cuando users no responde lo atenuaría, pero no cubre los tokens que el gateway todavía no vio.
+18. **La alerta *CPU de pod cerca del límite* es ciega en los pods con init containers sin `limits`** (C3). La regla divide el uso por `container_spec_cpu_quota` **del pod**, y Kubernetes no pone cuota a nivel de pod si algún contenedor (incluido un init container) no declara `limits.cpu`. `pharmago-db`, `elasticsearch`, `grafana` y `prometheus` tienen el init container `volume-permissions` sin límites, así que no tienen esa serie: en C3 la BD estuvo al 100% de su límite (1 core, medido en Prometheus) durante 10 min y la alerta no tenía contra qué comparar. Se deja como hueco documentado: C3 lo verifica con `forbid_alert`, que pasará a FAIL ("el hueco ya no existe") si se le ponen límites al init container.
 
 ## Archivos
 

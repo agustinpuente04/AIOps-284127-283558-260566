@@ -6,7 +6,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib/common.sh"
 scenario_init C2 "CPU al 100% en todas las réplicas de pharmacy-service" 600 "$@"
 W="$(arg_val --workers 4)"
 
-hypothesis "La latencia de /api/drug y /api/pharmacy aumenta, /api/users no se ve afectado y no hay caída total."
+hypothesis "Con la CPU de pharmacy saturada, /api/drug y /api/pharmacy se degradan sin caída total y /api/users no se ve afectado."
 expect_alert "CPU de pod cerca del límite"
 
 steady_state
@@ -18,14 +18,16 @@ phase antes; hold "$PRE_SECS"
 
 phase durante
 for p in $PODS; do inject_cpu "$p" "$SECS" "$W"; done
-hold "$SECS"
+hold $(( SECS / 2 ))
+for p in $PODS; do assert_cpu_saturated "$p"; done
+hold $(( SECS - SECS / 2 ))
 
 log "Rollback: deteniendo bucles de CPU"
 for p in $PODS; do kill_burn "$p"; done
 phase despues; hold "$POST_SECS"
 probe_stop
 
-assert_latency_up "$PHARMACY_PATHS" 2 p95
+note_latency "$PHARMACY_PATHS" p95
 assert_latency_flat "$USERS_PATHS" 3 p95
 assert_avail durante 95
 assert_avail despues 100

@@ -290,6 +290,29 @@ assert_p50_below() { # assert_p50_below <fase> <regex_path> <ms>   (los fallos d
   if [ "${s[4]}" -lt "$3" ]; then _result PASS "p50 en '$1' [$2] < ${3}ms (falla rápido)" "p50=${s[4]}ms, p95=${s[5]}ms"
   else _result FAIL "p50 en '$1' [$2] < ${3}ms (falla rápido)" "p50=${s[4]}ms, p95=${s[5]}ms"; fi
 }
+# note_latency <regex_path> [p50|p95] [fase]: registra cuánto cambió la latencia como OBSERVACIÓN, sin PASS/FAIL.
+# La magnitud de la degradación es un dato del experimento, no un requisito: un sistema que se degrada menos de
+# lo previsto no está fallando. Lo que se asserta es la propiedad de resiliencia (disponibilidad, reinicios, aislamiento).
+note_latency() {
+  local m="${2:-p95}" ph="${3:-durante}" b d idx=5; [ "$m" = p50 ] && idx=4
+  b=($(probe_stats antes "$1")); d=($(probe_stats "$ph" "$1"))
+  if [ "${b[0]}" = 0 ] || [ "${d[0]}" = 0 ]; then note "Latencia $m [$1]: sin muestras suficientes"; return; fi
+  note "Latencia $m [$1] en '$ph': ${b[$idx]}ms -> ${d[$idx]}ms ($(awk -v d="${d[$idx]}" -v b="${b[$idx]}" 'BEGIN { printf "x%.2f", (b > 0 ? d / b : 0) }'))"
+}
+# pod_cpu_pct <pod>: uso de CPU del contenedor en 3 s, en % de su limits.cpu (cgroup v2). Vacío si no tiene límite.
+pod_cpu_pct() {
+  _kexec "$1" 'read q p < /sys/fs/cgroup/cpu.max; [ "$q" = max ] && exit 0
+a=$(grep usage_usec /sys/fs/cgroup/cpu.stat | cut -d" " -f2); sleep 3; b=$(grep usage_usec /sys/fs/cgroup/cpu.stat | cut -d" " -f2)
+echo $(( (b - a) * p / (q * 30000) ))' 2>/dev/null | tr -d '\r' | grep -E '^[0-9]+$'
+}
+# assert_cpu_saturated <pod> [min%=90]: valida el EXPERIMENTO (que el estímulo llegó), no la hipótesis.
+# Si la CPU no se saturó, el resto de las conclusiones del escenario no valen.
+assert_cpu_saturated() {
+  local pct; pct="$(pod_cpu_pct "$1")"
+  if [ -z "$pct" ]; then _result FAIL "La inyección saturó la CPU de $1 (>= ${2:-90}% de su límite)" "no se pudo medir (¿sin limits.cpu?)"; return; fi
+  [ "$pct" -ge "${2:-90}" ] && _result PASS "La inyección saturó la CPU de $1 (>= ${2:-90}% de su límite)" "${pct}%" \
+                            || _result FAIL "La inyección saturó la CPU de $1 (>= ${2:-90}% de su límite)" "${pct}%: el estímulo no llegó"
+}
 assert_eq() { [ "$2" = "$3" ] && _result PASS "$1" "= $3" || _result FAIL "$1" "obtenido '$2', esperado '$3'"; }
 assert_true() { # assert_true <desc> <rc 0/1> [detalle]
   [ "$2" = 0 ] && _result PASS "$1" "$3" || _result FAIL "$1" "$3"
@@ -545,6 +568,12 @@ prom_scalar() {
 # conexiones concurrentes y da timeouts que NO son de la aplicación (verificado: 6000 requests con 200 clientes
 # desde dentro del nodo -> 0 timeouts). Para medir la app, la carga se genera desde el nodo.
 node_ssh_ok() { minikube ssh "true" >/dev/null 2>&1; }
+# owner_token -> token de sesión del usuario de pruebas (LOGIN_USER / LOGIN_PASS). La carga autenticada usa el cubo
+# del usuario ("u:{id}") y no el de la IP: así no agota el cubo anónimo que comparte con el probe de disponibilidad.
+owner_token() {
+  curl -s --max-time 10 -X POST "$URL/api/login" -H 'Content-Type: application/json' \
+       -d "{\"userName\":\"${LOGIN_USER:-admin}\",\"password\":\"${LOGIN_PASS:-Abcdef12.}\"}" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p'
+}
 # load_node <path> <concurrencia> <segundos> <archivo_salida> [spoof=0|1] [ui|gateway] [token]
 #   token -> las requests llevan "Authorization: <token>" (usuario autenticado, con su cubo propio)
 #   ui      -> NodePort de la UI (nginx -> gateway), igual que un usuario
