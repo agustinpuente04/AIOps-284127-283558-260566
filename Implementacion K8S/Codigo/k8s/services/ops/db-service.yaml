@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pharmago-db
+  namespace: pharmago
+spec:
+  selector:
+    app: pharmago-db
+  ports:
+  - port: 1433
+    targetPort: 1433
+    protocol: TCP
+  type: ClusterIP
+

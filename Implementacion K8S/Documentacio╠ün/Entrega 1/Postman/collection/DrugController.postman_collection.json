@@ -1,0 +1,513 @@
+{
+	"info": {
+		"_postman_id": "fdc6fd9c-020e-423b-b946-a1d44eb4009f",
+		"name": "DrugController",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "11269308"
+	},
+	"item": [
+		{
+			"name": "Crear Droga Ok",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"code\": \"PER\",\r\n  \"name\": \"perifar\",\r\n  \"symptom\": \"headache\",\r\n  \"quantity\": 50,\r\n  \"price\": 200,\r\n  \"prescription\": false,\r\n  \"unitMeasureName\": 1,\r\n  \"presentationName\": 1,\r\n  \"pharmacyName\": \"pharmacy1\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Drug",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Drug con mismo code pero distinta Farmacia Ok",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"code\": \"AXC\",\r\n  \"name\": \"drugName\",\r\n  \"symptom\": \"headache\",\r\n  \"quantity\": 50,\r\n  \"price\": 200,\r\n  \"prescription\": false,\r\n  \"unitMeasureName\": 1,\r\n  \"presentationName\": 1,\r\n  \"pharmacyName\": \"pharmacy1\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Drug",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Drug con codigo existente Error",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"code\": \"AXC\",\r\n  \"name\": \"name\",\r\n  \"symptom\": \"symptom\",\r\n  \"quantity\": 100,\r\n  \"price\": 200,\r\n  \"prescription\": true,\r\n  \"unitMeasureName\": 1,\r\n  \"presentationName\": 1,\r\n  \"pharmacyName\": \"pharmacy1\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Drug",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Drug con Farmacia inexistente Error",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"code\": \"codeD\",\r\n  \"name\": \"name\",\r\n  \"symptom\": \"symptom\",\r\n  \"quantity\": 100,\r\n  \"price\": 200,\r\n  \"prescription\": true,\r\n  \"unitMeasureName\": 1,\r\n  \"presentationName\": 1,\r\n  \"pharmacyName\": \"invalidPharmacy\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Drug",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Drugs sin parametros Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "",
+						"value": "",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Drug",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Drugs con parametros Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Drug?Name=Aspirine&PharmacyId=1",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug"
+					],
+					"query": [
+						{
+							"key": "Name",
+							"value": "Aspirine"
+						},
+						{
+							"key": "PharmacyId",
+							"value": "1"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Drugs por nombre Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Drug?Name=Aspirine",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug"
+					],
+					"query": [
+						{
+							"key": "Name",
+							"value": "Aspirine"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Drugs por farmacia Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Drug?PharmacyId=1",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug"
+					],
+					"query": [
+						{
+							"key": "PharmacyId",
+							"value": "1"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Drugs por farmacia inexistente Error",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Drug?PharmacyId=100",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug"
+					],
+					"query": [
+						{
+							"key": "PharmacyId",
+							"value": "100"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Drugs por nombre inexistente Ok Vacio",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Drug?Name=invalidname",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug"
+					],
+					"query": [
+						{
+							"key": "Name",
+							"value": "invalidname"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Drug por id Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Drug/1",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Drug por id inexistente Error",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Drug/50",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug",
+						"50"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Modificar Drug Ok",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"code\": \"AXC\",\r\n  \"name\": \"Aspirine\",\r\n  \"symptom\": \"headache\",\r\n  \"quantity\": 50,\r\n  \"price\": 200,\r\n  \"prescription\": false\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Drug/1",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Modificar Drug inexistente Error",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"code\": \"code5\",\r\n  \"name\": \"name5\",\r\n  \"symptom\": \"symptom5\",\r\n  \"quantity\": 300,\r\n  \"price\": 300,\r\n  \"prescription\": false\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Drug/50",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug",
+						"50"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Borrar Drug Ok",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Drug/2",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug",
+						"2"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Borrar Drug inexistente Error",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Drug/70",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Drug",
+						"70"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

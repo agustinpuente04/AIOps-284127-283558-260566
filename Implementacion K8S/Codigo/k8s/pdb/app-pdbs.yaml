@@ -1,0 +1,47 @@
+# PodDisruptionBudgets de los componentes de aplicación.
+# Garantizan que una interrupción voluntaria (kubectl drain, eviction, upgrade de nodo)
+# nunca deje una app sin al menos 1 réplica disponible.
+# Requieren replicas >= 2 en el Deployment (si no, bloquearían el drain del nodo).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pharmago-ui-pdb
+  namespace: pharmago
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pharmago-ui
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pharmago-api-gateway-pdb
+  namespace: pharmago
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pharmago-api-gateway
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pharmago-users-service-pdb
+  namespace: pharmago
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pharmago-users-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pharmago-pharmacy-service-pdb
+  namespace: pharmago
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pharmago-pharmacy-service

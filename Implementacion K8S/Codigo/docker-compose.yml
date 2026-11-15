@@ -1,0 +1,195 @@
+version: '3.8'
+
+services:
+  pharmago-db:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: pharmago-db
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_PID=Express
+      - SA_PASSWORD=Str0ngP@ssword!
+    ports:
+      - "11433:1433"
+    volumes:
+      - sql_data:/var/opt/mssql
+    networks:
+      - pharmago-network
+
+  pharmago-users-service:
+    build:
+      context: ./Backend
+      dockerfile: PharmaGo.UsersService/Dockerfile
+    container_name: pharmago-users-service
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=pharmago-db;Database=PharmaDb;User Id=sa;Password=Str0ngP@ssword!
+      - ServiceUrls__PharmacyService=http://pharmago-pharmacy-service:80
+      - ASPNETCORE_ENVIRONMENT=Production
+    ports:
+      - "5001:80"
+    depends_on:
+      - pharmago-db
+      - otlp-collector
+      - elasticsearch
+    networks:
+      - pharmago-network
+
+  pharmago-pharmacy-service:
+    build:
+      context: ./Backend
+      dockerfile: PharmaGo.PharmacyService/Dockerfile
+    container_name: pharmago-pharmacy-service
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=pharmago-db;Database=PharmaDb;User Id=sa;Password=Str0ngP@ssword!
+      - ServiceUrls__UsersService=http://pharmago-users-service:80
+      - ASPNETCORE_ENVIRONMENT=Production
+    ports:
+      - "5002:80"
+    depends_on:
+      - pharmago-db
+      - otlp-collector
+      - elasticsearch
+    networks:
+      - pharmago-network
+
+  pharmago-api-gateway:
+    build:
+      context: ./Backend
+      dockerfile: PharmaGo.ApiGateway/Dockerfile
+    container_name: pharmago-api-gateway
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    ports:
+      - "5000:80"      # API Gateway available on localhost:5000
+    depends_on:
+      - pharmago-users-service
+      - pharmago-pharmacy-service
+      - elasticsearch
+    networks:
+      - pharmago-network
+
+  otlp-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otlp-collector
+    ports:
+      - "4317:4317"
+      - "8889:8889"
+    volumes:
+      - ./Backend/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    networks:
+      - pharmago-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./Backend/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - pharmago-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - pharmago-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - pharmago-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - pharmago-network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: logstash
+    user: root
+    volumes:
+      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ./logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    depends_on:
+      - elasticsearch
+    networks:
+      - pharmago-network
+    environment:
+      - "LS_JAVA_OPTS=-Xmx256m -Xms256m"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  pharmago-ui:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: pharmago-ui
+    ports:
+      - "4200:80"  # The Angular app will be available on localhost:4200
+    depends_on:
+      - pharmago-api-gateway
+    networks:
+      - pharmago-network
+
+volumes:
+  sql_data:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:
+
+networks:
+  pharmago-network:
+    driver: bridge

@@ -1,0 +1,421 @@
+{
+	"info": {
+		"_postman_id": "c25989f8-290b-49f3-8513-9b5d5746cef0",
+		"name": "StockRequestController",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "11269308"
+	},
+	"item": [
+		{
+			"name": "Crear solicitud stock",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"employee\": \"jcastro\",\n  \"details\": [\n    {\n      \"drug\": {\n        \"code\": \"XF324\"\n      },\n      \"quantity\": 300\n    }\n  ]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear solicitud stock con medicamento inválido",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"employee\": \"jcastro\",\n  \"details\": [\n    {\n      \"drug\": {\n        \"code\": \"\"\n      },\n      \"quantity\": 300\n    }\n  ]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear solicitud stock sin medicamentos",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"employee\": \"jcastro\",\n  \"details\": [\n  ]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Rechazar solicitud stock",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": []
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest/rejectStockRequest/6",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest",
+						"rejectStockRequest",
+						"6"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Rechazar solicitud stock aprobada",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest/rejectStockRequest/2",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest",
+						"rejectStockRequest",
+						"2"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Rechazar solicitud stock rechazada",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest/rejectStockRequest/6",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest",
+						"rejectStockRequest",
+						"6"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Aprobar solicitud stock",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest/approveStockRequest/3",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest",
+						"approveStockRequest",
+						"3"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Aprobar solicitud stock rechazada",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest/approveStockRequest/6",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest",
+						"approveStockRequest",
+						"6"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Aprobar solicitud stock aprobada",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest/approveStockRequest/2",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest",
+						"approveStockRequest",
+						"2"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener solicitud de stock realizadas por los empleados",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": []
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest"
+					],
+					"query": [
+						{
+							"key": "FromDate",
+							"value": "",
+							"disabled": true
+						},
+						{
+							"key": "ToDate",
+							"value": "",
+							"disabled": true
+						},
+						{
+							"key": "Status",
+							"value": "Rejected",
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener solicitud de stock realizadas por empleado",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/stockRequest/byemployee",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"stockRequest",
+						"byemployee"
+					],
+					"query": [
+						{
+							"key": "FromDate",
+							"value": "",
+							"disabled": true
+						},
+						{
+							"key": "ToDate",
+							"value": "",
+							"disabled": true
+						},
+						{
+							"key": "Status",
+							"value": "Rejected",
+							"disabled": true
+						},
+						{
+							"key": "Code",
+							"value": null,
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

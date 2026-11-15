@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pharmago-users-service
+  namespace: pharmago
+spec:
+  # Alta disponibilidad: 2 réplicas + RollingUpdate sin indisponibilidad.
+  # maxUnavailable: 0 => el pod viejo solo se baja cuando el nuevo está Ready.
+  replicas: 2
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: pharmago-users-service
+  template:
+    metadata:
+      labels:
+        app: pharmago-users-service
+        pharmago.io/tier: microservice
+    spec:
+      # preStop (10s) + ShutdownTimeout de .NET (25s) < 40s
+      terminationGracePeriodSeconds: 40
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-type
+                operator: In
+                values: [backend, all]
+        # Regla de despliegue: dos microservicios distintos nunca comparten nodo físico.
+        # Se excluye la propia app para que el RollingUpdate pueda levantar el pod nuevo
+        # en el mismo nodo que el viejo sin quedar Pending.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: pharmago.io/tier
+                  operator: In
+                  values: [microservice]
+                - key: app
+                  operator: NotIn
+                  values: [pharmago-users-service]
+              topologyKey: kubernetes.io/hostname
+          # Repartir las réplicas de la misma app entre nodos (preferred: funciona con 1 nodo)
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: pharmago-users-service
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: pharmago-users-service
+        image: pharmago-users-service:latest
+        imagePullPolicy: Never
+        # Esperar a que kube-proxy saque el pod de los Endpoints antes del SIGTERM,
+        # para no recibir requests nuevas mientras Kestrel se apaga.
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "10"]
+        ports:
+        - containerPort: 80
+        env:
+        - name: ConnectionStrings__DefaultConnection
+          value: "Server=pharmago-db;Database=PharmaDb;User Id=sa;Password=Str0ngP@ssword!"
+        - name: ServiceUrls__PharmacyService
+          value: "http://pharmago-pharmacy-service:80"
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        - name: Logging__LogLevel__Microsoft.EntityFrameworkCore
+          value: "None"
+        - name: Logging__LogLevel__Microsoft.Data.SqlClient
+          value: "None"
+        # Recursos reducidos para nodos ~5GB (proyecto docente)
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "384Mi"
+            cpu: "500m"
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 15
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 7
+          timeoutSeconds: 3
+          failureThreshold: 2
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 15
+          timeoutSeconds: 3
+          failureThreshold: 3

@@ -1,0 +1,362 @@
+{
+	"info": {
+		"_postman_id": "4daa7fa7-3c1c-4401-ad33-72b4987e4ae8",
+		"name": "PurchasesController",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "11269308"
+	},
+	"item": [
+		{
+			"name": "Crear Compra Ok",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"buyerEmail\": \"norberto.perez@gmail.com\",\r\n  \"purchaseDate\": \"2022-10-01T15:21:31.816Z\",\r\n  \"pharmacyId\": 1,\r\n  \"details\": [\r\n    {\r\n      \"code\": \"XF324\",\r\n      \"quantity\": 2\r\n    },\r\n    {\r\n      \"code\": \"RS546\",\r\n      \"quantity\": 3\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/purchases",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Compra Error - Email Invalido",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"buyerEmail\": \"fernando@gmail.com\",\r\n  \"purchaseDate\": \"2022-09-30T15:21:31.816Z\",\r\n  \"pharmacyId\": 1,\r\n  \"details\": [\r\n    {\r\n      \"code\": \"XF324\",\r\n      \"quantity\": 1\r\n    },\r\n    {\r\n      \"code\": \"RS546\",\r\n      \"quantity\": 1\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/purchases",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Compra Error - Lista de Items vacía",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"buyerEmail\": \"fernando@gmail.com\",\r\n  \"purchaseDate\": \"2022-09-30T15:21:31.816Z\",\r\n  \"pharmacyId\": 1,\r\n  \"details\": []\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/purchases",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Compra Error - Farmacia no encontrada",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"buyerEmail\": \"fernando@gmail.com\",\r\n  \"purchaseDate\": \"2022-09-30T15:21:31.816Z\",\r\n  \"pharmacyId\": 1000,\r\n  \"details\": [\r\n    {\r\n      \"code\": \"XF324\",\r\n      \"quantity\": 1\r\n    },\r\n    {\r\n      \"code\": \"RS546\",\r\n      \"quantity\": 1\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/purchases",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Compra Error - Cantidad de un Medicamento > Stock",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"buyerEmail\": \"norberto.perez@gmail.com\",\r\n  \"purchaseDate\": \"2022-10-01T15:21:31.816Z\",\r\n  \"pharmacyId\": 1,\r\n  \"details\": [\r\n    {\r\n      \"code\": \"XF324\",\r\n      \"quantity\": 99999\r\n    },\r\n    {\r\n      \"code\": \"RS546\",\r\n      \"quantity\": 3\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/purchases",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Compra Error - La cantidad de un Medicamento es 0",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"buyerEmail\": \"norberto.perez@gmail.com\",\r\n  \"purchaseDate\": \"2022-10-01T15:21:31.816Z\",\r\n  \"pharmacyId\": 1,\r\n  \"details\": [\r\n    {\r\n      \"code\": \"XF324\",\r\n      \"quantity\": 2\r\n    },\r\n    {\r\n      \"code\": \"RS546\",\r\n      \"quantity\": 0\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/purchases",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Compra Error - No existe al menos uno de los Medicamentos a comprar",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"buyerEmail\": \"norberto.perez@gmail.com\",\r\n  \"purchaseDate\": \"2022-10-01T15:21:31.816Z\",\r\n  \"pharmacyId\": 1,\r\n  \"details\": [\r\n    {\r\n      \"code\": \"XF3200\",\r\n      \"quantity\": 2\r\n    },\r\n    {\r\n      \"code\": \"RS546\",\r\n      \"quantity\": 3\r\n    }\r\n  ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/purchases",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Compras por Año y Mes",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/purchases/bymonth?year=2022&month=09",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases",
+						"bymonth"
+					],
+					"query": [
+						{
+							"key": "year",
+							"value": "2022"
+						},
+						{
+							"key": "month",
+							"value": "09"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Compras por Año y Mes - Error Mes vacío",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/purchases/bymonth?year=2022",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases",
+						"bymonth"
+					],
+					"query": [
+						{
+							"key": "year",
+							"value": "2022"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Compras por Año y Mes - Error Mes no válido",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/purchases/bymonth?year=2022&month=13",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases",
+						"bymonth"
+					],
+					"query": [
+						{
+							"key": "year",
+							"value": "2022"
+						},
+						{
+							"key": "month",
+							"value": "13"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Compras por Año y Mes - Error Año no válido",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/purchases/bymonth?year=20224&month=09",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases",
+						"bymonth"
+					],
+					"query": [
+						{
+							"key": "year",
+							"value": "20224"
+						},
+						{
+							"key": "month",
+							"value": "09"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Compras Todas Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/purchases",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"purchases"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

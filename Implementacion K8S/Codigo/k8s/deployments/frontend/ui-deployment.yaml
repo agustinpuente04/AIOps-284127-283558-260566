@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pharmago-ui
+  namespace: pharmago
+spec:
+  # Alta disponibilidad: 2 réplicas + RollingUpdate sin indisponibilidad.
+  # maxUnavailable: 0 => el pod viejo solo se baja cuando el nuevo está Ready.
+  replicas: 2
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: pharmago-ui
+  template:
+    metadata:
+      labels:
+        app: pharmago-ui
+    spec:
+      # preStop (10s) + cierre ordenado de nginx (SIGQUIT) < 30s
+      terminationGracePeriodSeconds: 30
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-type
+                operator: In
+                values: [frontend, all]
+        # Repartir las réplicas entre nodos (preferred: funciona con 1 nodo)
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 50
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: pharmago-ui
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: pharmago-ui
+        image: pharmago-ui:latest
+        imagePullPolicy: Never
+        # Esperar a que kube-proxy saque el pod de los Endpoints antes de que nginx se apague.
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sleep", "10"]
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+

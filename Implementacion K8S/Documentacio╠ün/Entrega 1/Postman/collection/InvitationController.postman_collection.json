@@ -1,0 +1,241 @@
+{
+	"info": {
+		"_postman_id": "5111c75d-1553-4ac3-aecd-ae71c06a4c76",
+		"name": "InvitationController",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "11269308"
+	},
+	"item": [
+		{
+			"name": "Crear invitación - Username único.",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"userName\": \"admin\",\n  \"role\": \"Administrator\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/invitation",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"invitation"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear invitación - Con farmacia ok",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"pharmacy\": \"pharmacy\",\n  \"userName\": \"salvarez\",\n  \"role\": \"Employee\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/invitation",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"invitation"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear invitación - Con farmacia ok Owner",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"pharmacy\": \"pharmacy\",\n  \"userName\": \"salvarez\",\n  \"role\": \"Owner\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/invitation",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"invitation"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear invitación - Sin username error",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"userName\": \"\",\n  \"role\": \"Owner\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/invitation",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"invitation"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear invitación - Sin rol error",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"userName\": \"test2\",\n  \"role\": \"\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/invitation",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"invitation"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear invitación - Sin farmacia error",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"userName\": \"test3\",\n  \"role\": \"Owner\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/invitation",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"invitation"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear invitación - Con farmacia error",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"pharmacy\": \"Lola\",\n  \"userName\": \"salvareza\",\n  \"role\": \"Administrator\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/invitation",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"invitation"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

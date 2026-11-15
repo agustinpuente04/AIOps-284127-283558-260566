@@ -1,0 +1,498 @@
+{
+	"info": {
+		"_postman_id": "2276df73-0d93-46a6-8966-7380b8e467de",
+		"name": "PharmacyController",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "11269308"
+	},
+	"item": [
+		{
+			"name": "Crear Farmacia Ok",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"pharmacy\",\r\n  \"address\": \"address\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Pharmacy",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Farmacia Existente Error",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"pharmacy\",\r\n  \"address\": \"address100\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Pharmacy",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear farmacia Nombre largo Error",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"This is an invalid large name for a pharmacy with more than 50 characters.\",\r\n  \"address\": \"address123\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Pharmacy",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Farmacias sin parametros Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Pharmacy",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Farmacias con parametros Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Pharmacy?Name=pharmacy&Address=address",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy"
+					],
+					"query": [
+						{
+							"key": "Name",
+							"value": "pharmacy"
+						},
+						{
+							"key": "Address",
+							"value": "address"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Farmacias con parametros inexistentes Ok Vacio",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Pharmacy?Name=invalidPharmacy&Address=invalidAddress",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy"
+					],
+					"query": [
+						{
+							"key": "Name",
+							"value": "invalidPharmacy"
+						},
+						{
+							"key": "Address",
+							"value": "invalidAddress"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Farmacias por nombre Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Pharmacy?Name=pharmacy",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy"
+					],
+					"query": [
+						{
+							"key": "Name",
+							"value": "pharmacy"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Farmacias por direccion Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Pharmacy?Address=address",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy"
+					],
+					"query": [
+						{
+							"key": "Address",
+							"value": "address"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Farmacias por nombre inexistente Ok Vacio",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Pharmacy?Name=inexistentnamePharmacy",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy"
+					],
+					"query": [
+						{
+							"key": "Name",
+							"value": "inexistentnamePharmacy"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Farmacias por direccion inexistente Ok Vacio",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Pharmacy?Address=inexistentAddressPharmacy",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy"
+					],
+					"query": [
+						{
+							"key": "Address",
+							"value": "inexistentAddressPharmacy"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Farmacia por id Ok",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Pharmacy/1",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener Farmacia por id inexistente Error",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Pharmacy/60",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy",
+						"60"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Modificar Farmacia Ok",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"pharmacy1\",\r\n  \"address\": \"address\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Pharmacy/1",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Modificar Farmacia inexistente Error",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"newPharmacyName\",\r\n  \"address\": \"newPharmacyAddress\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Pharmacy/60",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy",
+						"60"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Borrar Farmacia por id Ok",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{host}}/api/Pharmacy/1",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Borrar Farmacia por id inexistente Error",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "{{ACCESS_TOKEN}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"name\": \"newPharmacyName\",\r\n  \"address\": \"newPharmacyAddress\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/Pharmacy/60",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"Pharmacy",
+						"60"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

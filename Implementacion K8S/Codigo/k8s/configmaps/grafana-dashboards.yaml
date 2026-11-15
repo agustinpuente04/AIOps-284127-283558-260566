@@ -1,0 +1,478 @@
+# Generado a partir de la definición del dashboard. JSON indentado para que los cambios
+# se puedan revisar en un diff. Grafana lo carga por provisioning (ver grafana-deployment.yaml).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: pharmago
+data:
+  pharmago-overview.json: |
+    {
+      "title": "PharmaGo - Overview",
+      "uid": "pharmago-overview",
+      "tags": [
+        "pharmago",
+        "http"
+      ],
+      "refresh": "10s",
+      "time": {
+        "from": "now-30m",
+        "to": "now"
+      },
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "version": 1,
+      "editable": true,
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Peticiones por Segundo por Endpoint",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (endpoint) (rate(pharmago_http_requests_total{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m]))",
+              "legendFormat": "{{endpoint}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Latencia Promedio por Endpoint",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (endpoint) (rate(pharmago_http_request_duration_milliseconds_sum{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m])) / sum by (endpoint) (rate(pharmago_http_request_duration_milliseconds_count{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m]))",
+              "legendFormat": "{{endpoint}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "Tasa de Error por Endpoint (%)",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "(sum by (endpoint) (rate(pharmago_http_errors_total{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m])) / sum by (endpoint) (rate(pharmago_http_requests_total{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m])) * 100) or on() vector(0)",
+              "legendFormat": "{{endpoint}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "Throughput por Servicio",
+          "description": "Una request que entra por el gateway se cuenta en el gateway y en el servicio destino.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (exported_job) (rate(pharmago_http_requests_total{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m]))",
+              "legendFormat": "{{exported_job}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Rate Limit Errors (429) por Endpoint",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (endpoint) (rate(pharmago_http_requests_total{job=\"otlp-collector\", endpoint!~\"/health|/metrics\", status_code=\"429\"}[5m]))",
+              "legendFormat": "{{endpoint}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Distribución de Status Codes (%)",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (status_code) (rate(pharmago_http_requests_total{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m])) / scalar(sum(rate(pharmago_http_requests_total{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m]))) * 100",
+              "legendFormat": "{{status_code}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Tasa de Error por Tipo de Error (Todos los Endpoints)",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 24,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (error_type) (rate(pharmago_http_errors_total{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m])) / on() group_left() sum(rate(pharmago_http_requests_total{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m])) * 100",
+              "legendFormat": "{{error_type}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Tasa de Error - /api/drug (429 y Total)",
+          "description": "",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 24,
+            "w": 12,
+            "h": 8
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "(sum(rate(pharmago_http_requests_total{job=\"otlp-collector\", endpoint=\"/api/drug\", status_code=\"429\"}[5m])) / sum(rate(pharmago_http_requests_total{job=\"otlp-collector\", endpoint=\"/api/drug\"}[5m])) * 100) or on() vector(0)",
+              "legendFormat": "429 %",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            },
+            {
+              "refId": "B",
+              "expr": "(sum(rate(pharmago_http_errors_total{job=\"otlp-collector\", endpoint=\"/api/drug\"}[5m])) / sum(rate(pharmago_http_requests_total{job=\"otlp-collector\", endpoint=\"/api/drug\"}[5m])) * 100) or on() vector(0)",
+              "legendFormat": "errores totales %",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "Latencia p95 por Servicio",
+          "description": "Base de la alerta 'Latencia anómala'.",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 32,
+            "w": 24,
+            "h": 8
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.95, sum by (exported_job, le) (rate(pharmago_http_request_duration_milliseconds_bucket{job=\"otlp-collector\", endpoint!~\"/health|/metrics\"}[5m])))",
+              "legendFormat": "{{exported_job}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [
+                "mean",
+                "max"
+              ],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        }
+      ]
+    }

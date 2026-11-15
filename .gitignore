@@ -1,0 +1,70 @@
+# === .NET / C# ===
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.log
+packages/
+[Dd]ebug/
+[Rr]elease/
+.vs/
+*.csproj.user
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# === Angular / Node ===
+node_modules/
+dist/
+.angular/
+*.ngfactory.ts
+*.ngsummary.json
+.npm
+.env.local
+.env.*.local
+
+# === IDE ===
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+*.code-workspace
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Logs & temp ===
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# === Kubernetes / local ===
+k8s/.port-forward.pids
+
+# === Secrets (evitar subir credenciales) ===
+*.pfx
+.env
+
+# === Docker ===
+.docker/
+docker-compose.override.yml
+
+.port-forward.pids
+
+# === graphify (grafo local, se regenera con los hooks de git) ===
+graphify-out/
+
+# === Claude Code / graphify (configuración local, cada quien la instala con graphify install --project) ===
+.claude/
+CLAUDE.md
+.graphifyignore
+.gitattributes

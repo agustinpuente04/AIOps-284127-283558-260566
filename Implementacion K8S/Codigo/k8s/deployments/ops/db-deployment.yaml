@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pharmago-db
+  namespace: pharmago
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pharmago-db
+  template:
+    metadata:
+      labels:
+        app: pharmago-db
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-type
+                operator: In
+                values: [ops, all]
+      securityContext:
+        fsGroup: 0
+      # InitContainer para configurar permisos del volumen
+      initContainers:
+      - name: volume-permissions
+        image: busybox:latest
+        command: ['sh', '-c']
+        args:
+          - |
+            chown -R 10001:0 /var/opt/mssql
+            chmod -R 770 /var/opt/mssql
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: sql-storage
+          mountPath: /var/opt/mssql
+      containers:
+      - name: pharmago-db
+        image: mcr.microsoft.com/mssql/server:2019-latest
+        ports:
+        - containerPort: 1433
+        env:
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: MSSQL_PID
+          value: "Express"
+        - name: SA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secret
+              key: SA_PASSWORD
+        securityContext:
+          runAsUser: 10001
+        volumeMounts:
+        - name: sql-storage
+          mountPath: /var/opt/mssql
+        readinessProbe:
+          tcpSocket:
+            port: 1433
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          tcpSocket:
+            port: 1433
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+        resources:
+          requests:
+            memory: "768Mi"
+            cpu: "500m"
+          limits:
+            memory: "1.5Gi"
+            cpu: "1000m"
+      volumes:
+      - name: sql-storage
+        persistentVolumeClaim:
+          claimName: sql-pvc
+

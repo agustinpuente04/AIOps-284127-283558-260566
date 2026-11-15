@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elasticsearch
+  namespace: pharmago
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-type
+                operator: In
+                values: [ops, all]
+      securityContext:
+        fsGroup: 1000
+      # InitContainer para configurar permisos del volumen
+      initContainers:
+      - name: volume-permissions
+        image: busybox:latest
+        command: ['sh', '-c']
+        args:
+          - |
+            chown -R 1000:1000 /usr/share/elasticsearch/data
+            chmod -R 770 /usr/share/elasticsearch/data
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: elasticsearch-storage
+          mountPath: /usr/share/elasticsearch/data
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+        ports:
+        - containerPort: 9200
+          name: http
+        - containerPort: 9300
+          name: transport
+        env:
+        - name: discovery.type
+          value: "single-node"
+        - name: xpack.security.enabled
+          value: "false"
+        - name: xpack.monitoring.collection.enabled
+          value: "false"
+        - name: xpack.ml.enabled
+          value: "false"
+        - name: xpack.watcher.enabled
+          value: "false"
+        - name: ES_JAVA_OPTS
+          value: "-Xms512m -Xmx512m"
+        volumeMounts:
+        - name: elasticsearch-storage
+          mountPath: /usr/share/elasticsearch/data
+        # request bajo para poder schedulear en nodos de ~5GB; limit evita OOM
+        resources:
+          requests:
+            memory: "768Mi"
+            cpu: "250m"
+          limits:
+            memory: "1.5Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+          initialDelaySeconds: 300
+          periodSeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 10
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+          initialDelaySeconds: 180
+          periodSeconds: 30
+          timeoutSeconds: 30
+          failureThreshold: 10
+      volumes:
+      - name: elasticsearch-storage
+        persistentVolumeClaim:
+          claimName: elasticsearch-pvc
+

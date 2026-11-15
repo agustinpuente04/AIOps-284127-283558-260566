@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: 'otlp-collector'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['otlp-collector:8889']
+  
+  - job_name: 'users-service'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['pharmago-users-service:80']
+  
+  - job_name: 'pharmacy-service'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['pharmago-pharmacy-service:80']
+  
+  - job_name: 'api-gateway'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['pharmago-api-gateway:80']

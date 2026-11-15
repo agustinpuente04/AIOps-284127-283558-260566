@@ -1,0 +1,260 @@
+{
+	"info": {
+		"_postman_id": "29b9e7c1-5156-4f7f-b74d-041779895dad",
+		"name": "UsersController",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "11269308"
+	},
+	"item": [
+		{
+			"name": "Crear Usuario Ok",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "12345",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userName\": \"pablo1986\",\r\n  \"userCode\": \"774244\",\r\n  \"email\": \"pablo1986@gmail.com\",\r\n  \"password\": \"Gasdfrt567..\",\r\n  \"address\": \"Br. Artigas 1486 entre Palmar y Av. Rivera\",\r\n  \"registrationDate\": \"2022-09-23T20:22:14.101Z\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/users",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"users"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Usuario Error - Invitación ya utilizada",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userName\": \"pablo1986\",\r\n  \"userCode\": \"560913\",\r\n  \"email\": \"pablo1986@gmail.com\",\r\n  \"password\": \"Gasdfrt567..\",\r\n  \"address\": \"Br. Artigas 1486 entre Palmar y Av. Rivera\",\r\n  \"registrationDate\": \"2022-09-23T20:22:14.101Z\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/users",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"users"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Usuario Error - Nombre de usuario no válido",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userName\": \"\",\r\n  \"userCode\": \"560913\",\r\n  \"email\": \"pablo1986@gmail.com\",\r\n  \"password\": \"Gasdfrt567..\",\r\n  \"address\": \"Br. Artigas 1486 entre Palmar y Av. Rivera\",\r\n  \"registrationDate\": \"2022-09-23T20:22:14.101Z\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/users",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"users"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Usuario Error - Código de Usuario no válido",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userName\": \"pablo1986\",\r\n  \"userCode\": \"560913a\",\r\n  \"email\": \"pablo1986@gmail.com\",\r\n  \"password\": \"Gasdfrt567..\",\r\n  \"address\": \"Br. Artigas 1486 entre Palmar y Av. Rivera\",\r\n  \"registrationDate\": \"2022-09-23T20:22:14.101Z\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/users",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"users"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Usuario Error - Email no válido",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userName\": \"pablo1986\",\r\n  \"userCode\": \"560913\",\r\n  \"email\": \"pablo1986@@gmail.com\",\r\n  \"password\": \"Gasdfrt567..\",\r\n  \"address\": \"Br. Artigas 1486 entre Palmar y Av. Rivera\",\r\n  \"registrationDate\": \"2022-09-23T20:22:14.101Z\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/users",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"users"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Usuario Error - Password no válido",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userName\": \"pablo1986\",\r\n  \"userCode\": \"560913\",\r\n  \"email\": \"pablo1986@gmail.com\",\r\n  \"password\": \"Gasdfrt567\",\r\n  \"address\": \"Br. Artigas 1486 entre Palmar y Av. Rivera\",\r\n  \"registrationDate\": \"2022-09-23T20:22:14.101Z\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/users",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"users"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Usuario Error - Dirección no válida",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userName\": \"pablo1986\",\r\n  \"userCode\": \"560913\",\r\n  \"email\": \"pablo1986@gmail.com\",\r\n  \"password\": \"Gasdfrt567..\",\r\n  \"address\": \"\",\r\n  \"registrationDate\": \"2022-09-23T20:22:14.101Z\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/users",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"users"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Usuario Error - El Nombre de Usuario ya existe",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userName\": \"pablo1986\",\r\n  \"userCode\": \"222555\",\r\n  \"email\": \"roberto@gmail.com\",\r\n  \"password\": \"Password123.\",\r\n  \"address\": \"Br. Artigas 1486 entre Palmar y Av. Rivera\",\r\n  \"registrationDate\": \"2022-09-23T20:22:14.101Z\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/users",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"users"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Crear Usuario Error - El Email ya existe en el sistema",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userName\": \"roberto\",\r\n  \"userCode\": \"111555\",\r\n  \"email\": \"roberto@gmail.com\",\r\n  \"password\": \"Gasdfrt567..\",\r\n  \"address\": \"Br. Artigas 1486 entre Palmar y Av. Rivera\",\r\n  \"registrationDate\": \"2022-09-23T20:22:14.101Z\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{host}}/api/users",
+					"host": [
+						"{{host}}"
+					],
+					"path": [
+						"api",
+						"users"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

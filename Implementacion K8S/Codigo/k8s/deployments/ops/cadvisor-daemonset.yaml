@@ -1,0 +1,80 @@
+# cAdvisor standalone (uno por nodo).
+#
+# Por qué existe, si el kubelet ya trae cAdvisor: con el runtime cri-dockerd + cgroup v2 que usa
+# Minikube, el cAdvisor embebido del kubelet solo reporta CPU/memoria a nivel de pod (sin label
+# "container") y NO reporta red ni filesystem por pod (solo para la raíz del nodo). Este cAdvisor
+# lee los contenedores directamente desde Docker, así que sí expone red (RX/TX) y filesystem por
+# contenedor, con las labels de Kubernetes (pod, namespace, container).
+#
+# Prometheus lo scrapea en el job "cadvisor" (ver configmaps/prometheus-config.yaml).
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cadvisor
+  namespace: pharmago
+  labels:
+    app: cadvisor
+spec:
+  selector:
+    matchLabels:
+      app: cadvisor
+  template:
+    metadata:
+      labels:
+        app: cadvisor
+    spec:
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: cadvisor
+          image: gcr.io/cadvisor/cadvisor:v0.47.2
+          args:
+            - --housekeeping_interval=10s
+            - --docker_only=true
+            # Solo las métricas que se usan (red, filesystem, CPU, memoria): baja la cardinalidad
+            - --disable_metrics=accelerator,cpu_topology,disk,hugetlb,memory_numa,percpu,process,referenced_memory,resctrl,sched,tcp,udp,advtcp,cpuset,oom_event
+            - --store_container_labels=false
+            - --whitelisted_container_labels=io.kubernetes.pod.name,io.kubernetes.pod.namespace,io.kubernetes.container.name
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 384Mi
+          volumeMounts:
+            - name: rootfs
+              mountPath: /rootfs
+              readOnly: true
+            - name: var-run
+              mountPath: /var/run
+              readOnly: true
+            - name: sys
+              mountPath: /sys
+              readOnly: true
+            - name: docker
+              mountPath: /var/lib/docker
+              readOnly: true
+            - name: disk
+              mountPath: /dev/disk
+              readOnly: true
+      volumes:
+        - name: rootfs
+          hostPath:
+            path: /
+        - name: var-run
+          hostPath:
+            path: /var/run
+        - name: sys
+          hostPath:
+            path: /sys
+        - name: docker
+          hostPath:
+            path: /var/lib/docker
+        - name: disk
+          hostPath:
+            path: /dev/disk

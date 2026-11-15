@@ -1,0 +1,361 @@
+# Alertas de Grafana (unified alerting) provisionadas por archivo.
+#
+# - Contact point: Discord. La URL del webhook NO está en el repo: la toma de la variable de
+#   entorno ALERT_WEBHOOK_URL del pod de Grafana, que sale del Secret "grafana-alerting"
+#   (lo crean apply-k8s.sh / apply-k8s.ps1 a partir de la variable ALERT_WEBHOOK_URL de tu shell).
+# - Grafana interpola variables de entorno en los settings del contact point ($ALERT_WEBHOOK_URL),
+#   pero no en las reglas: en las anotaciones $labels / $values se escriben tal cual.
+# - Todas las métricas de app se toman de la vía OTLP (job="otlp-collector"), donde cada réplica
+#   es una serie distinta, y se excluyen las requests de probes/scrapes (/health, /metrics).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alerting
+  namespace: pharmago
+data:
+  alerting.yaml: |
+    apiVersion: 1
+
+    contactPoints:
+      - orgId: 1
+        name: discord-pharmago
+        receivers:
+          - uid: discord-pharmago
+            type: discord
+            settings:
+              url: $ALERT_WEBHOOK_URL
+              use_discord_username: false
+            disableResolveMessage: false
+
+    policies:
+      - orgId: 1
+        receiver: discord-pharmago
+        group_by: ["grafana_folder", "alertname"]
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+
+    groups:
+      - orgId: 1
+        name: pharmago-anomalias
+        folder: PharmaGo
+        interval: 1m
+        rules:
+
+          # 1 ---------------------------------------------------------------------------
+          - uid: pharmago-errores-5xx
+            title: Tasa de errores 5xx anómala
+            condition: B
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  range: false
+                  expr: >-
+                    sum by (exported_job) (rate(pharmago_http_requests_total{job="otlp-collector", endpoint!~"/health|/metrics", status_code=~"5.."}[5m]))
+                    / sum by (exported_job) (rate(pharmago_http_requests_total{job="otlp-collector", endpoint!~"/health|/metrics"}[5m])) * 100
+              - refId: B
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: { type: gt, params: [5] }
+            for: 2m
+            noDataState: OK
+            execErrState: Error
+            labels: { severity: critical, team: pharmago }
+            annotations:
+              summary: '{{ $labels.exported_job }}: {{ printf "%.1f" $values.A.Value }}% de respuestas 5xx'
+              description: Más del 5% de las respuestas del servicio son errores de servidor (5xx) en los últimos 5 minutos. Revisar logs en Kibana (LogLevel Error) y el estado de la base de datos.
+
+          # 2 ---------------------------------------------------------------------------
+          - uid: pharmago-latencia-anomala
+            title: Latencia anómala respecto de la línea base
+            condition: B
+            data:
+              - refId: A
+                relativeTimeRange: { from: 3600, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  range: false
+                  expr: >-
+                    (
+                      (sum by (exported_job) (rate(pharmago_http_request_duration_milliseconds_sum{job="otlp-collector", endpoint!~"/health|/metrics"}[5m]))
+                        / sum by (exported_job) (rate(pharmago_http_request_duration_milliseconds_count{job="otlp-collector", endpoint!~"/health|/metrics"}[5m])))
+                      /
+                      (sum by (exported_job) (rate(pharmago_http_request_duration_milliseconds_sum{job="otlp-collector", endpoint!~"/health|/metrics"}[1h]))
+                        / sum by (exported_job) (rate(pharmago_http_request_duration_milliseconds_count{job="otlp-collector", endpoint!~"/health|/metrics"}[1h])))
+                    )
+                    and on (exported_job)
+                    (
+                      sum by (exported_job) (rate(pharmago_http_request_duration_milliseconds_sum{job="otlp-collector", endpoint!~"/health|/metrics"}[5m]))
+                        / sum by (exported_job) (rate(pharmago_http_request_duration_milliseconds_count{job="otlp-collector", endpoint!~"/health|/metrics"}[5m])) > 200
+                    )
+              - refId: B
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: { type: gt, params: [3] }
+            for: 3m
+            noDataState: OK
+            execErrState: Error
+            labels: { severity: warning, team: pharmago }
+            annotations:
+              summary: '{{ $labels.exported_job }}: latencia {{ printf "%.1f" $values.A.Value }}x sobre su promedio de la última hora'
+              description: La latencia media de los últimos 5 minutos es más de 3 veces la de la última hora (y supera 200 ms). Posible saturación, lentitud de la base de datos o un deploy con regresión.
+
+          # 3 ---------------------------------------------------------------------------
+          - uid: pharmago-trafico-zscore
+            title: Tráfico anómalo en el gateway (z-score)
+            condition: B
+            data:
+              - refId: A
+                relativeTimeRange: { from: 3600, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  range: false
+                  expr: >-
+                    (
+                      abs(
+                        sum(rate(pharmago_http_requests_total{job="otlp-collector", exported_job="PharmaGo.ApiGateway", endpoint!~"/health|/metrics"}[5m]))
+                        - avg_over_time(sum(rate(pharmago_http_requests_total{job="otlp-collector", exported_job="PharmaGo.ApiGateway", endpoint!~"/health|/metrics"}[5m]))[1h:1m])
+                      )
+                      / (stddev_over_time(sum(rate(pharmago_http_requests_total{job="otlp-collector", exported_job="PharmaGo.ApiGateway", endpoint!~"/health|/metrics"}[5m]))[1h:1m]) > 0)
+                    )
+                    and on ()
+                    (sum(rate(pharmago_http_requests_total{job="otlp-collector", exported_job="PharmaGo.ApiGateway", endpoint!~"/health|/metrics"}[5m])) > 0.2)
+              - refId: B
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: { type: gt, params: [3] }
+            for: 2m
+            noDataState: OK
+            execErrState: Error
+            labels: { severity: warning, team: pharmago }
+            annotations:
+              summary: 'Tráfico del gateway a {{ printf "%.1f" $values.A.Value }} desvíos estándar de su media de la última hora'
+              description: El volumen de requests que entra por el API Gateway se aleja más de 3 desvíos estándar de su comportamiento de la última hora (z-score). Puede ser un pico legítimo, un cliente en loop o un ataque.
+
+          # 4 ---------------------------------------------------------------------------
+          - uid: pharmago-logins-fallidos
+            title: Logins fallidos anómalos (posible fuerza bruta)
+            condition: B
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  range: false
+                  expr: sum(rate(pharmago_logins_total{job="otlp-collector", outcome="failed"}[5m])) * 60
+              - refId: B
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: { type: gt, params: [5] }
+            for: 1m
+            noDataState: OK
+            execErrState: Error
+            labels: { severity: warning, team: pharmago }
+            annotations:
+              summary: '{{ printf "%.1f" $values.A.Value }} logins fallidos por minuto'
+              description: Más de 5 logins fallidos por minuto en promedio durante los últimos 5 minutos. En Kibana, buscar Scopes.pharma_biz:"login_fail" para ver usuarios y correlation_id.
+
+          # 5 ---------------------------------------------------------------------------
+          - uid: pharmago-cpu-pod
+            title: CPU de pod cerca del límite
+            condition: B
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  range: false
+                  expr: >-
+                    sum by (pod) (rate(container_cpu_usage_seconds_total{namespace="pharmago"}[5m]))
+                    / sum by (pod) (container_spec_cpu_quota{namespace="pharmago"} / container_spec_cpu_period{namespace="pharmago"}) * 100
+              - refId: B
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: { type: gt, params: [80] }
+            for: 3m
+            noDataState: OK
+            execErrState: Error
+            labels: { severity: warning, team: pharmago }
+            annotations:
+              summary: '{{ $labels.pod }} usa el {{ printf "%.0f" $values.A.Value }}% de su límite de CPU'
+              description: El pod está usando más del 80% de su limits.cpu de forma sostenida, así que Kubernetes lo está limitando (throttling) y la latencia sube. Revisar carga o escalar réplicas.
+
+          # 6 ---------------------------------------------------------------------------
+          - uid: pharmago-memoria-pod
+            title: Memoria de pod cerca del límite (riesgo de OOMKill)
+            condition: B
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  range: false
+                  expr: >-
+                    sum by (pod) (container_memory_working_set_bytes{namespace="pharmago"})
+                    / sum by (pod) (container_spec_memory_limit_bytes{namespace="pharmago"} > 0) * 100
+              - refId: B
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: { type: gt, params: [85] }
+            for: 3m
+            noDataState: OK
+            execErrState: Error
+            labels: { severity: critical, team: pharmago }
+            annotations:
+              summary: '{{ $labels.pod }} usa el {{ printf "%.0f" $values.A.Value }}% de su límite de memoria'
+              description: Al llegar al 100% de limits.memory el kernel mata el contenedor (OOMKilled) y se reinicia. Posible pérdida de memoria (memory leak) o un límite demasiado bajo.
+
+          # 7 ---------------------------------------------------------------------------
+          - uid: pharmago-disco-nodo
+            title: Disco del nodo casi lleno
+            condition: B
+            data:
+              - refId: A
+                relativeTimeRange: { from: 600, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  range: false
+                  expr: >-
+                    min by (instance, mountpoint) (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100
+              - refId: B
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: { type: lt, params: [15] }
+            for: 5m
+            noDataState: OK
+            execErrState: Error
+            labels: { severity: critical, team: pharmago }
+            annotations:
+              summary: '{{ $labels.mountpoint }} en {{ $labels.instance }}: {{ printf "%.1f" $values.A.Value }}% libre'
+              description: Queda menos del 15% de espacio libre en un filesystem del nodo. Elasticsearch, Prometheus y SQL Server escriben ahí (volúmenes hostPath) y pueden dejar de funcionar.
+
+          # 8 ---------------------------------------------------------------------------
+          - uid: pharmago-circuit-breaker
+            title: Circuit breaker abierto
+            condition: B
+            data:
+              - refId: A
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  range: false
+                  expr: max by (exported_job, target) (pharmago_circuit_breaker_state{job="otlp-collector"})
+              - refId: B
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: { type: gt, params: [0.9] }
+            for: 0s
+            noDataState: OK
+            execErrState: Error
+            labels: { severity: critical, team: pharmago }
+            annotations:
+              summary: '{{ $labels.exported_job }} cortó las llamadas a {{ $labels.target }} (circuit breaker abierto)'
+              description: Polly abrió el circuit breaker después de 3 fallas transitorias seguidas. Durante 30 s las llamadas a ese servicio fallan sin intentarse. Verificar que el servicio destino esté sano.
+
+          # 9 ---------------------------------------------------------------------------
+          - uid: pharmago-requests-en-curso
+            title: Saturación de requests en curso
+            condition: B
+            data:
+              - refId: A
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  range: false
+                  expr: max by (exported_job, exported_instance) (pharmago_http_requests_in_flight{job="otlp-collector"})
+              - refId: B
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: { type: gt, params: [20] }
+            for: 2m
+            noDataState: OK
+            execErrState: Error
+            labels: { severity: warning, team: pharmago }
+            annotations:
+              summary: 'Una réplica de {{ $labels.exported_job }} tiene {{ printf "%.0f" $values.A.Value }} requests en curso'
+              description: Las requests se están acumulando en una réplica (se procesan más lento de lo que llegan). Suele anticipar subas de latencia y timeouts.
+
+          # 10 --------------------------------------------------------------------------
+          - uid: pharmago-servicio-caido
+            title: Servicio sin réplicas disponibles
+            condition: B
+            data:
+              - refId: A
+                relativeTimeRange: { from: 300, to: 0 }
+                datasourceUid: prometheus
+                model:
+                  refId: A
+                  instant: true
+                  range: false
+                  expr: up{job=~"api-gateway|users-service|pharmacy-service"}
+              - refId: B
+                datasourceUid: __expr__
+                model:
+                  refId: B
+                  type: threshold
+                  expression: A
+                  conditions:
+                    - evaluator: { type: lt, params: [1] }
+            for: 1m
+            noDataState: OK
+            execErrState: Error
+            labels: { severity: critical, team: pharmago }
+            annotations:
+              summary: '{{ $labels.job }} no responde'
+              description: Prometheus no puede scrapear el Service. Ninguna réplica del servicio está disponible (todos los pods caídos o sin readiness), así que el servicio está fuera de línea.

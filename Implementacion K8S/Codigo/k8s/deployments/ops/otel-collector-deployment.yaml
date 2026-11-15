@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otlp-collector
+  namespace: pharmago
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otlp-collector
+  template:
+    metadata:
+      labels:
+        app: otlp-collector
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-type
+                operator: In
+                values: [ops, all]
+      containers:
+      - name: otlp-collector
+        image: otel/opentelemetry-collector-contrib:latest
+        ports:
+        - containerPort: 4317
+          name: otlp-grpc
+        - containerPort: 8889
+          name: prometheus
+        args:
+          - "--config=/etc/otel-collector-config.yaml"
+        volumeMounts:
+        - name: otel-config
+          mountPath: /etc/otel-collector-config.yaml
+          subPath: otel-collector-config.yaml
+      volumes:
+      - name: otel-config
+        configMap:
+          name: otel-collector-config
+
