@@ -70,6 +70,11 @@ spec:
         env:
         - name: ASPNETCORE_ENVIRONMENT
           value: "Production"
+        # Proxies de confianza para leer la IP real del cliente (X-Forwarded-For): SOLO los pods de nginx. Se resuelven
+        # por DNS desde un Service headless (ver services/frontend/ui-service.yaml). Cualquier otro origen (otro pod, el
+        # puente del nodo, un port-forward) no puede falsificar la IP: su cabecera se ignora.
+        - name: RateLimiting__TrustedProxyHosts__0
+          value: "pharmago-ui-pods"
         # Recursos reducidos para nodos ~5GB (proyecto docente)
         resources:
           requests:

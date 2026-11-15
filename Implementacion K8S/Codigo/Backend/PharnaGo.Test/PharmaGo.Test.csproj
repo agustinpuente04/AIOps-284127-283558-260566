@@ -21,6 +21,7 @@
     <ProjectReference Include="..\PharmaGo.BusinessLogic\PharmaGo.BusinessLogic.csproj" />
     <ProjectReference Include="..\PharmaGo.IBusinessLogic\PharmaGo.IBusinessLogic.csproj" />
     <ProjectReference Include="..\PharmaGo.WebApi\PharmaGo.WebApi.csproj" />
+    <ProjectReference Include="..\PharmaGo.ApiGateway\PharmaGo.ApiGateway.csproj" />
   </ItemGroup>
 
 </Project>

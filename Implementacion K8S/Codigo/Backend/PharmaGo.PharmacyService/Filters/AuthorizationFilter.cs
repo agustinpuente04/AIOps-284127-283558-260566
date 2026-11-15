@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using PharmaGo.IDataAccess;
 using PharmaGo.Domain.Entities;
+using PharmaGo.Exceptions;
 
 namespace PharmaGo.PharmacyService.Filters
 {
@@ -42,6 +43,10 @@ namespace PharmaGo.PharmacyService.Filters
                 Session session = sessionRepository.GetOneByExpression(x => x.Token == guidToken);
                 return session != null;
             }
+            catch (DatabaseUnavailableException)
+            {
+                throw;   // una BD caída no es "token inválido": que responda 503 el ExceptionFilter
+            }
             catch
             {
                 return false;
@@ -68,6 +73,10 @@ namespace PharmaGo.PharmacyService.Filters
                     if (user.Role.Name.ToLower() == role.ToLower()) return true;
                 }
                 return false;
+            }
+            catch (DatabaseUnavailableException)
+            {
+                throw;   // una BD caída no es "token inválido": que responda 503 el ExceptionFilter
             }
             catch
             {

@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
+    <PackageReference Include="Polly" Version="7.2.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="6.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="6.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="6.0.8">
@@ -19,5 +21,6 @@
   <ItemGroup>
     <ProjectReference Include="..\PharmaGo.Domain\PharmaGo.Domain.csproj" />
     <ProjectReference Include="..\PharmaGo.IDataAccess\PharmaGo.IDataAccess.csproj" />
+    <ProjectReference Include="..\PharmaGo.Exceptions\PharmaGo.Exceptions.csproj" />
   </ItemGroup>
 </Project>

@@ -5,10 +5,12 @@ using Microsoft.Extensions.DependencyInjection;
 using PharmaGo.PharmacyService.BusinessLogic;
 using PharmaGo.DataAccess;
 using PharmaGo.DataAccess.Repositories;
+using PharmaGo.DataAccess.Resilience;
 using PharmaGo.Domain.Entities;
 using PharmaGo.PharmacyService.IBusinessLogic;
 using PharmaGo.IDataAccess;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using InstrumentationInterface;
 using Instrumentation;
 using PharmaGo.Common.Resilience;
@@ -40,21 +42,32 @@ namespace PharmaGo.PharmacyService.Factory
 
         public static void RegisterDataAccessServices(this IServiceCollection serviceCollection, IConfiguration configuration)
         {
-            serviceCollection.AddScoped<IRepository<User>, UsersRepository>();
-            serviceCollection.AddScoped<IRepository<Session>, SessionRepository>();
-            serviceCollection.AddScoped<IRepository<StockRequest>, StockRequestRepository>();
-            serviceCollection.AddScoped<IRepository<Pharmacy>, PharmacyRepository>();
-            serviceCollection.AddScoped<IRepository<UnitMeasure>, UnitMeasureRepository>();
-            serviceCollection.AddScoped<IRepository<Purchase>, PurchasesRepository>();
-            serviceCollection.AddScoped<IRepository<Presentation>, PresentationRepository>();
-            serviceCollection.AddScoped<IRepository<Drug>, DrugRepository>();
-            serviceCollection.AddScoped<IRepository<PurchaseDetail>, PurchasesDetailRepository>();
+            // Resiliencia del acceso a la BD: timeout corto + circuit breaker por entidad + retry con equal jitter.
+            // Ver Backend/RESILIENCIA_BD.md.
+            var resilience = DbResilienceOptions.FromConfiguration(key => configuration[key]);
+            serviceCollection.AddDbResilience(resilience, sp => new MetricsDbResilienceObserver(sp.GetRequiredService<ILoggerFactory>()));
+
+            serviceCollection.AddResilientRepository<User, UsersRepository>();
+            serviceCollection.AddResilientRepository<Session, SessionRepository>();
+            serviceCollection.AddResilientRepository<StockRequest, StockRequestRepository>();
+            serviceCollection.AddResilientRepository<Pharmacy, PharmacyRepository>();
+            serviceCollection.AddResilientRepository<UnitMeasure, UnitMeasureRepository>();
+            serviceCollection.AddResilientRepository<Purchase, PurchasesRepository>();
+            serviceCollection.AddResilientRepository<Presentation, PresentationRepository>();
+            serviceCollection.AddResilientRepository<Drug, DrugRepository>();
+            serviceCollection.AddResilientRepository<PurchaseDetail, PurchasesDetailRepository>();
 
             serviceCollection.AddDbContext<DbContext, PharmacyGoDbContext>(options =>
             {
+                // CommandTimeout corto: las consultas de EF son síncronas y solo SqlClient puede cortarlas. Con el valor por defecto
+                // (30 s) una tabla bloqueada ocupa un hilo y una conexión medio minuto por request (escenario C4).
                 options.UseSqlServer(
-                    configuration.GetConnectionString("DefaultConnection"),
-                    sqlOptions => { sqlOptions.MigrationsAssembly("PharmaGo.DataAccess"); });
+                    resilience.ApplyConnectTimeout(configuration.GetConnectionString("DefaultConnection")),
+                    sqlOptions =>
+                    {
+                        sqlOptions.MigrationsAssembly("PharmaGo.DataAccess");
+                        sqlOptions.CommandTimeout(resilience.CommandTimeoutSeconds);
+                    });
                 options.ConfigureWarnings(w =>
                 {
                     w.Ignore(CoreEventId.LazyLoadOnDisposedContextWarning);

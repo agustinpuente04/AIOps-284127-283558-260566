@@ -11,4 +11,20 @@ spec:
     targetPort: 80
     protocol: TCP
   type: NodePort
+---
+# Service headless: no balancea nada, solo publica en DNS las IPs de los pods de nginx (solo los Ready).
+# El gateway las usa para saber en qué peers confiar al leer la IP real del cliente en X-Forwarded-For.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pharmago-ui-pods
+  namespace: pharmago
+spec:
+  clusterIP: None
+  selector:
+    app: pharmago-ui
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
 
